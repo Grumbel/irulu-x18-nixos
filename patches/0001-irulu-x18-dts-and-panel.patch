@@ -1,0 +1,731 @@
+diff -ruN a/arch/arm64/boot/dts/allwinner/Makefile b/arch/arm64/boot/dts/allwinner/Makefile
+--- a/arch/arm64/boot/dts/allwinner/Makefile	2026-10-20 13:43:21.487912284 +0200
++++ b/arch/arm64/boot/dts/allwinner/Makefile	2026-10-20 13:43:21.503217230 +0200
+@@ -3,6 +3,7 @@
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-bananapi-m64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-nanopi-a64.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-oceanic-5205-5inmfd.dtb
++dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-irulu-x18.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-olinuxino-emmc.dtb
+ dtb-$(CONFIG_ARCH_SUNXI) += sun50i-a64-orangepi-win.dtb
+diff -ruN a/arch/arm64/boot/dts/allwinner/sun50i-a64-irulu-x18.dts b/arch/arm64/boot/dts/allwinner/sun50i-a64-irulu-x18.dts
+--- a/arch/arm64/boot/dts/allwinner/sun50i-a64-irulu-x18.dts	1970-01-01 01:00:00.000000000 +0100
++++ b/arch/arm64/boot/dts/allwinner/sun50i-a64-irulu-x18.dts	2026-10-20 13:43:21.507029934 +0200
+@@ -0,0 +1,432 @@
++// SPDX-License-Identifier: (GPL-2.0+ OR MIT)
++/*
++ * iRULU X18 8" tablet (Allwinner A64, AXP803, JD9365 MIPI-DSI panel,
++ * Silead GSL1680 touch, RTL8723BS Wi-Fi/BT)
++ *
++ * DRAFT - UNTESTED. Derived from the vendor Android 3.10 BSP device tree
++ * (dump/dt/sun50iw1p1-irulu-x18-android.dts) and runtime state of the
++ * stock firmware. Lines marked TODO need verification on hardware.
++ *
++ * Copy into arch/arm64/boot/dts/allwinner/ and add to the Makefile.
++ */
++
++/dts-v1/;
++
++#include "sun50i-a64.dtsi"
++#include "sun50i-a64-cpu-opp.dtsi"
++
++#include <dt-bindings/gpio/gpio.h>
++#include <dt-bindings/input/input.h>
++#include <dt-bindings/interrupt-controller/irq.h>
++#include <dt-bindings/pwm/pwm.h>
++
++/ {
++	model = "iRULU X18";
++	compatible = "irulu,x18", "allwinner,sun50i-a64";
++
++	aliases {
++		serial0 = &uart0;
++		ethernet0 = &rtl8723bs;
++	};
++
++	chosen {
++		stdout-path = "serial0:115200n8";
++	};
++
++	backlight: backlight {
++		compatible = "pwm-backlight";
++		/* BSP: lcd_pwm_ch=0, lcd_pwm_freq=50000 Hz, lcd_pwm_pol=1 */
++		pwms = <&pwm 0 20000 PWM_POLARITY_INVERTED>; /* TODO: verify polarity */
++		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 lcd_bl_en */
++		brightness-levels = <0 1000>;
++		num-interpolated-steps = <1000>;
++		default-brightness-level = <400>;
++	};
++
++	speaker_amp: audio-amplifier {
++		compatible = "simple-audio-amplifier";
++		enable-gpios = <&pio 7 7 GPIO_ACTIVE_HIGH>; /* PH7 gpio-spk */
++		sound-name-prefix = "Speaker Amp";
++	};
++
++	wifi_pwrseq: pwrseq {
++		compatible = "mmc-pwrseq-simple";
++		reset-gpios = <&r_pio 0 2 GPIO_ACTIVE_LOW>; /* PL2 wlan_regon */
++		post-power-on-delay-ms = <200>;
++	};
++};
++
++&codec {
++	status = "okay";
++};
++
++&codec_analog {
++	cpvdd-supply = <&reg_eldo1>;
++	status = "okay";
++};
++
++&cpu0 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&cpu1 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&cpu2 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&cpu3 {
++	cpu-supply = <&reg_dcdc2>;
++};
++
++&dai {
++	status = "okay";
++};
++
++&de {
++	status = "okay";
++};
++
++&dphy {
++	status = "okay";
++};
++
++&dsi {
++	vcc-dsi-supply = <&reg_dldo1>; /* vcc-dsi-33 */
++	status = "okay";
++
++	panel@0 {
++		/*
++		 * LT080B21BA94, 800x1280, 4-lane DSI, Jadard JD9365 controller.
++		 * Needs patches/0001-drm-panel-jadard-add-iRULU-X18-panel.patch.
++		 */
++		compatible = "irulu,x18-panel", "jadard,jd9365da-h3";
++		reg = <0>;
++		reset-gpios = <&pio 3 24 GPIO_ACTIVE_LOW>; /* PD24 lcd_gpio_1 */
++		vdd-supply = <&reg_dldo2>;	/* vcc-lcd 3.3V */
++		vccio-supply = <&reg_eldo2>;	/* vcc-mipi 1.8V */
++		backlight = <&backlight>;
++	};
++};
++
++&ehci0 {
++	status = "okay";
++};
++
++&ehci1 {
++	status = "okay";
++};
++
++&i2c0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c0_pins>; /* PH0/PH1 */
++	status = "okay";
++
++	touchscreen@40 {
++		compatible = "silead,gsl1680";
++		reg = <0x40>;
++		interrupt-parent = <&pio>;
++		interrupts = <7 4 IRQ_TYPE_EDGE_FALLING>; /* PH4 ctp_int_port */
++		power-gpios = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 ctp_wakeup */
++		vddio-supply = <&reg_ldo_io0>; /* vcc-ctp */
++		firmware-name = "gsl1680-irulu-x18.fw";
++		/* BSP: ctp_screen_max 800x1280 with ctp_exchange_x_y_flag=1 */
++		touchscreen-size-x = <1280>; /* TODO: verify */
++		touchscreen-size-y = <800>;
++		touchscreen-swapped-x-y;
++		silead,max-fingers = <10>;
++	};
++};
++
++&i2c1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&i2c1_pins>; /* PH2/PH3 */
++	status = "okay";
++
++	/*
++	 * MiraMEMS "mir3da" accelerometer at 0x27 (BSP DT says 0x1d, the
++	 * driver probes 0x27). Interrupt on PH5. TODO: identify the chip
++	 * (DA213/DA217/DA280?) and check drivers/iio/accel/da280.c.
++	 */
++};
++
++&lradc {
++	vref-supply = <&reg_aldo3>;
++	status = "okay";
++
++	/*
++	 * BSP "keyboard_2000mv" upper thresholds in mV:
++	 * 240 VOLUMEUP, 500 VOLUMEDOWN, 700 MENU, 890 ENTER, 2000 HOME.
++	 * TODO: measure real voltages, the tablet likely only has vol+/vol-.
++	 */
++	button-200 {
++		label = "Volume Up";
++		linux,code = <KEY_VOLUMEUP>;
++		channel = <0>;
++		voltage = <200000>;
++	};
++
++	button-400 {
++		label = "Volume Down";
++		linux,code = <KEY_VOLUMEDOWN>;
++		channel = <0>;
++		voltage = <400000>;
++	};
++};
++
++&mixer0 {
++	status = "okay";
++};
++
++&mmc0 {
++	vmmc-supply = <&reg_dcdc1>; /* vcc-sdc */
++	cd-gpios = <&pio 5 6 GPIO_ACTIVE_LOW>; /* PF6 */
++	disable-wp;
++	bus-width = <4>;
++	status = "okay";
++};
++
++&mmc1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&mmc1_pins>;
++	vmmc-supply = <&reg_dldo4>; /* vcc-wifi-io */
++	vqmmc-supply = <&reg_dldo4>; /* vcc-pg */
++	mmc-pwrseq = <&wifi_pwrseq>;
++	bus-width = <4>;
++	non-removable;
++	status = "okay";
++
++	rtl8723bs: wifi@1 {
++		reg = <1>;
++		interrupt-parent = <&r_pio>;
++		interrupts = <0 3 IRQ_TYPE_LEVEL_LOW>; /* PL3 wlan_hostwake */
++		interrupt-names = "host-wake";
++	};
++};
++
++/* The internal raw NAND (Allwinner proprietary FTL) is not usable. */
++
++&ohci0 {
++	status = "okay";
++};
++
++&ohci1 {
++	status = "okay";
++};
++
++&pio {
++	vcc-pb-supply = <&reg_dcdc1>;
++	vcc-pc-supply = <&reg_eldo1>;	/* BSP: eldo1 -> vcc-pc */
++	vcc-pd-supply = <&reg_dcdc1>;
++	vcc-pe-supply = <&reg_aldo1>;	/* TODO: CSI bank, unverified */
++	vcc-pf-supply = <&reg_dcdc1>;
++	vcc-pg-supply = <&reg_dldo4>;
++	vcc-ph-supply = <&reg_dcdc1>;
++};
++
++&pwm {
++	status = "okay";
++};
++
++&r_rsb {
++	status = "okay";
++
++	/* BSP: pmu_id=6 (AXP81x family), axp81x regulators */
++	axp803: pmic@3a3 {
++		compatible = "x-powers,axp803";
++		reg = <0x3a3>;
++		interrupt-parent = <&r_intc>;
++		interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_LOW>;
++		x-powers,drive-vbus-en;
++	};
++};
++
++#include "axp803.dtsi"
++
++&ac_power_supply {
++	status = "okay";
++};
++
++&battery_power_supply {
++	/* 4000 mAh, 4.2 V (pmu_battery_cap, pmu_init_chgvol) */
++	status = "okay";
++};
++
++&reg_aldo1 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "iovdd-csi";
++};
++
++&reg_aldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-pl";
++};
++
++&reg_aldo3 {
++	regulator-always-on;
++	regulator-min-microvolt = <3000000>;
++	regulator-max-microvolt = <3000000>;
++	regulator-name = "vcc-pll-avcc";
++};
++
++&reg_dc1sw {
++	regulator-name = "vcc-dc1sw";
++};
++
++&reg_dcdc1 {
++	regulator-always-on;
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-3v3";
++};
++
++&reg_dcdc2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1000000>;
++	regulator-max-microvolt = <1300000>;
++	regulator-name = "vdd-cpux";
++};
++
++/* BSP shows dcdc3 enabled at 1.1V with no users; left alone like on the PineTab. */
++
++&reg_dcdc5 {
++	regulator-always-on;
++	regulator-min-microvolt = <1500000>; /* DDR3 (not DDR3L) */
++	regulator-max-microvolt = <1500000>;
++	regulator-name = "vcc-dram";
++};
++
++&reg_dcdc6 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-sys";
++};
++
++&reg_dldo1 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-dsi-hdmi";
++};
++
++&reg_dldo2 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-lcd";
++};
++
++&reg_dldo3 {
++	regulator-min-microvolt = <2800000>;
++	regulator-max-microvolt = <2800000>;
++	regulator-name = "avdd-csi";
++};
++
++&reg_dldo4 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-wifi-io";
++};
++
++&reg_drivevbus {
++	regulator-name = "usb0-vbus";
++	status = "okay";
++};
++
++&reg_eldo1 {
++	regulator-always-on;
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "cpvdd";
++};
++
++&reg_eldo2 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "vcc-mipi";
++};
++
++&reg_eldo3 {
++	regulator-min-microvolt = <1800000>;
++	regulator-max-microvolt = <1800000>;
++	regulator-name = "dvdd-csi";
++};
++
++&reg_fldo1 {
++	regulator-min-microvolt = <1200000>;
++	regulator-max-microvolt = <1200000>;
++	regulator-name = "vcc-1v2-hsic";
++};
++
++&reg_fldo2 {
++	regulator-always-on;
++	regulator-min-microvolt = <1100000>;
++	regulator-max-microvolt = <1100000>;
++	regulator-name = "vdd-cpus";
++};
++
++&reg_ldo_io0 {
++	regulator-min-microvolt = <3300000>;
++	regulator-max-microvolt = <3300000>;
++	regulator-name = "vcc-ctp";
++	status = "okay";
++};
++
++&reg_rtc_ldo {
++	regulator-name = "vcc-rtc";
++};
++
++&sound {
++	simple-audio-card,aux-devs = <&codec_analog>, <&speaker_amp>;
++	simple-audio-card,widgets = "Microphone", "Internal Microphone",
++				    "Headphone", "Headphone Jack",
++				    "Speaker", "Internal Speaker";
++	simple-audio-card,routing =
++			"Left DAC", "DACL",
++			"Right DAC", "DACR",
++			"Speaker Amp INL", "LINEOUT",
++			"Speaker Amp INR", "LINEOUT",
++			"Internal Speaker", "Speaker Amp OUTL",
++			"Internal Speaker", "Speaker Amp OUTR",
++			"Headphone Jack", "HP",
++			"ADCL", "Left ADC",
++			"ADCR", "Right ADC",
++			"Internal Microphone", "MBIAS",
++			"MIC1", "Internal Microphone";
++	status = "okay";
++};
++
++/* Debug UART: PB8/PB9 test pads, or PF2/PF4 via a microSD breakout */
++&uart0 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart0_pb_pins>;
++	status = "okay";
++};
++
++&uart1 {
++	pinctrl-names = "default";
++	pinctrl-0 = <&uart1_pins>, <&uart1_rts_cts_pins>;
++	uart-has-rtscts;
++	status = "okay";
++
++	bluetooth {
++		compatible = "realtek,rtl8723bs-bt";
++		enable-gpios = <&r_pio 0 4 GPIO_ACTIVE_HIGH>; /* PL4 bt_rst_n */
++	};
++};
++
++&usb_otg {
++	dr_mode = "otg";
++	status = "okay";
++};
++
++&usbphy {
++	usb0_id_det-gpios = <&pio 7 9 GPIO_ACTIVE_HIGH>; /* PH9 */
++	usb0_vbus_power-supply = <&usb_power_supply>;
++	usb0_vbus-supply = <&reg_drivevbus>;
++	status = "okay";
++};
+diff -ruN a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c
+--- a/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c	2026-10-20 13:43:21.485997566 +0200
++++ b/drivers/gpu/drm/panel/panel-jadard-jd9365da-h3.c	2026-10-20 13:43:21.503128342 +0200
+@@ -1113,6 +1113,269 @@
+ 	.enter_sleep_to_reset_down_delay_ms = 100,
+ };
+ 
++static int irulu_x18_init_cmds(struct jadard *jadard)
++{
++	struct mipi_dsi_multi_context dsi_ctx = { .dsi = jadard->dsi };
++
++	/* Taken from the vendor BSP (disp.ko, LCM_LT080B21BA94_setting) */
++	mipi_dsi_dcs_soft_reset_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 10);
++
++	jd9365da_switch_page(&dsi_ctx, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xE1, 0x93);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xE2, 0x65);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0xE3, 0xF8);
++
++	jd9365da_switch_page(&dsi_ctx, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x70, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x71, 0x23);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x72, 0x06);
++
++	jd9365da_switch_page(&dsi_ctx, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x00, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x01, 0xA0);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x03, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x04, 0xA0);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x17, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x18, 0xB1);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x19, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1A, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1B, 0xB1);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1C, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1F, 0x48);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x20, 0x23);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x21, 0x23);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x22, 0x0E);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x23, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x24, 0x38);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x26, 0xD3);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x37, 0x59);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x38, 0x05);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x39, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3A, 0x12);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3C, 0x78);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3E, 0x80);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3F, 0x80);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x40, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x41, 0xA0);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x55, 0x0F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x56, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x57, 0x85);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x58, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x59, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5A, 0x32);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5B, 0x0F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5D, 0x7C);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5E, 0x62);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5F, 0x50);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x60, 0x42);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x61, 0x3D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x62, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x63, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x64, 0x19);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x65, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x66, 0x2E);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x67, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x4A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x69, 0x3A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6A, 0x43);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6B, 0x37);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6C, 0x37);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6D, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6E, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6F, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x70, 0x7C);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x71, 0x62);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x72, 0x50);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x73, 0x42);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x74, 0x3D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x75, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x76, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x77, 0x19);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x78, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x79, 0x2E);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7A, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7B, 0x4A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7C, 0x3A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7D, 0x43);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7E, 0x37);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7F, 0x37);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x80, 0x2D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x81, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x82, 0x00);
++
++	jd9365da_switch_page(&dsi_ctx, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x00, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x01, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x02, 0x13);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x03, 0x11);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x04, 0x0B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x05, 0x0B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x06, 0x09);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x07, 0x09);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x08, 0x07);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x09, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0A, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0B, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0C, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0D, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0E, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0F, 0x07);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x10, 0x05);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x11, 0x05);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x12, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x13, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x14, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x15, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x16, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x17, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x18, 0x12);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x19, 0x10);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1A, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1B, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1C, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1D, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1E, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x1F, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x20, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x21, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x22, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x23, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x24, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x25, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x26, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x27, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x28, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x29, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2A, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2B, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2C, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2D, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2E, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2F, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x30, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x31, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x32, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x33, 0x0A);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x34, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x35, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x36, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x37, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x38, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x39, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3A, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3B, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3C, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3D, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3E, 0x12);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x3F, 0x10);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x40, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x41, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x42, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x43, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x44, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x45, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x46, 0x09);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x47, 0x09);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x48, 0x0B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x49, 0x0B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4A, 0x05);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4B, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4C, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4D, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4E, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x4F, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x50, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x51, 0x05);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x52, 0x07);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x53, 0x07);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x54, 0x13);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x55, 0x11);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x56, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x57, 0x1F);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x58, 0x40);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x59, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5A, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5B, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5C, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5D, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5E, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x5F, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x60, 0x30);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x61, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x62, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x63, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x64, 0x6B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x65, 0x75);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x66, 0x08);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x67, 0x73);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x68, 0x02);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x69, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6A, 0x6B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6B, 0x07);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6C, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6D, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6E, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x6F, 0x88);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x70, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x71, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x72, 0x06);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x73, 0x7B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x74, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x75, 0x3C);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x76, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x77, 0x0D);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x78, 0x2C);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x79, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7A, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7B, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7C, 0x00);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7D, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x7E, 0x7B);
++
++	jd9365da_switch_page(&dsi_ctx, 0x01);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x0E, 0x01);
++
++	jd9365da_switch_page(&dsi_ctx, 0x03);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x98, 0x2F);
++
++	jd9365da_switch_page(&dsi_ctx, 0x04);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2B, 0x2B);
++	mipi_dsi_dcs_write_seq_multi(&dsi_ctx, 0x2E, 0x44);
++
++	jd9365da_switch_page(&dsi_ctx, 0x00);
++	mipi_dsi_dcs_exit_sleep_mode_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 120);
++	mipi_dsi_dcs_set_display_on_multi(&dsi_ctx);
++	mipi_dsi_msleep(&dsi_ctx, 5);
++
++	return dsi_ctx.accum_err;
++};
++
++static const struct jadard_panel_desc irulu_x18_desc = {
++	.mode = {
++		.clock		= 70000,
++
++		.hdisplay	= 800,
++		.hsync_start	= 800 + 31,
++		.hsync_end	= 800 + 31 + 16,
++		.htotal		= 800 + 31 + 16 + 133,
++
++		.vdisplay	= 1280,
++		.vsync_start	= 1280 + 42,
++		.vsync_end	= 1280 + 42 + 5,
++		.vtotal		= 1280 + 42 + 5 + 2,
++
++		.width_mm	= 108,
++		.height_mm	= 172,
++		.type		= DRM_MODE_TYPE_DRIVER | DRM_MODE_TYPE_PREFERRED,
++	},
++	.lanes = 4,
++	.format = MIPI_DSI_FMT_RGB888,
++	.init = irulu_x18_init_cmds,
++	.vcioo_to_lp11_delay_ms = 5,
++};
++
+ static int jadard_dsi_probe(struct mipi_dsi_device *dsi)
+ {
+ 	struct device *dev = &dsi->dev;
+@@ -1186,6 +1449,10 @@
+ 		.data = &cz101b4001_desc
+ 	},
+ 	{
++		.compatible = "irulu,x18-panel",
++		.data = &irulu_x18_desc
++	},
++	{
+ 		.compatible = "kingdisplay,kd101ne3-40ti",
+ 		.data = &kingdisplay_kd101ne3_40ti_desc
+ 	},
