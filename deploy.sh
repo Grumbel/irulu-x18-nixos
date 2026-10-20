@@ -37,7 +37,7 @@ Host x18
   UserKnownHostsFile ${XDG_CACHE_HOME:-$HOME/.cache}/irulu-x18-known_hosts
 EOF
 
-NIX_SSHOPTS="-F $cfg" nixos-rebuild "$action" --flake path:.#irulu-x18 --target-host x18
+NIX_SSHOPTS="-F $cfg" nixos-rebuild "$action" --flake .#irulu-x18 --target-host x18
 
 if [ "${2:-}" = --reboot ]; then
     ssh -F "$cfg" x18 systemctl reboot || true

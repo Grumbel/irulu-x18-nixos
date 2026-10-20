@@ -1,166 +1,269 @@
-# NixOS SD image for the iRULU X18
+# NixOS for the iRULU X18 / eXpro X1S tablet
 
-Boots mainline Linux 6.18 from microSD. The internal NAND/Android stays
-untouched; remove the card and the tablet boots Android again.
+Run a current mainline Linux (6.18) with NixOS on the **iRULU eXpro X1S**,
+an 8" Android tablet from around 2016. The system boots from a microSD
+card; Android on the internal flash stays untouched. Take the card out and
+the tablet boots Android again.
 
-## Build
+On Amazon this tablet was sold as *"iRULU eXpro X1S Tablet PC, Android 5.1
+Lollipop, Quad Core, 16 GB Nand Flash, 8 Zoll mit HD-Auflösung 1280 \* 800,
+weiss und silber mit Metallgehäuse"*. Internally it calls itself **X18**.
+
+## Is this my tablet?
+
+Under Android, *Settings → About tablet* should show:
+
+| | |
+|---|---|
+| Model | **X18** |
+| Android version | 5.1.1 |
+| Build number | LVY48E.OGS.20160127 (or similar) |
+
+Inside: Allwinner **A64** (4× Cortex-A53, Mali-400 MP2 GPU), 1 GB RAM,
+16 GB NAND, 800×1280 MIPI-DSI panel, Silead touchscreen, RTL8723BS Wi-Fi
+and Bluetooth, X-Powers AXP803 power management.
+
+Other A64 tablets may be similar, but the display, touch and Wi-Fi setup
+are specific to this board. Booting from SD is harmless to try, though.
+
+## What works
+
+| | Status |
+|---|---|
+| Display (800×1280) and backlight | ✅ |
+| Touchscreen (multi-touch) | ✅ |
+| GPU: OpenGL ES 2.0 (Mesa lima), KMS/DRM | ✅ about 64 fps vsync |
+| Wi-Fi (2.4 GHz) | ✅ |
+| Bluetooth | ✅ firmware loads, little tested |
+| Speaker | ✅ |
+| Battery level, power-off at 3.3 V | ✅ |
+| Suspend to RAM (deep sleep), power-button wake | ✅ |
+| USB networking to a PC (micro-USB port) | ✅ |
+| Volume buttons | ⚠️ configured, voltages not verified |
+| Headphones, charging with a wall charger | ❓ untested |
+| Microphone, accelerometer, cameras | ❌ not yet |
+
+See [Known issues](#known-issues) for details.
+
+## What you need
+
+- A **microSD card**, 8 GB or larger (the image is about 4 GB; a good brand,
+  cheap cards show I/O
+  errors under load)
+- A **Linux PC with [Nix](https://nixos.org/download/)** and flakes enabled
+- To build on an x86_64 PC: aarch64 emulation. On NixOS:
+  `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];`
+  The kernel and bootloader are cross-compiled; everything else comes
+  prebuilt from the NixOS binary cache.
+- A **micro-USB cable** (for SSH access without Wi-Fi)
+
+## Installation
+
+### 1. Build the SD card image
 
 ```sh
-cd nixos
-nix build path:.#sdImage -L
+git clone <this repository> irulu-x18-nixos
+cd irulu-x18-nixos
+nix build .#sdImage -L
 ```
 
-Use `path:.#…`, not `.#…`. With the latter, Nix copies the whole git
-repository, including the multi-GB `dump/`, into the store.
+The first build takes a while (mainly the kernel, about 6 minutes, and the
+crust firmware toolchain, about 20 minutes once). The image ends up in
+`result/sd-image/`.
 
-Requirements: an x86_64 NixOS host with
-`boot.binfmt.emulatedSystems = [ "aarch64-linux" ]`. The kernel and U-Boot
-are cross-compiled; the rest is native aarch64 and comes from
-cache.nixos.org.
+### 2. Write it to the microSD card
 
-Other outputs: `.#kernel`, `.#uboot`, `.#toplevel`.
-
-## Flash
+Check the device name of your card reader first (`lsblk`), then:
 
 ```sh
-sudo dd if=result/sd-image/*.img of=/dev/sdX bs=4M conv=fsync status=progress
+sudo dd if=result/sd-image/nixos-image-sd-card-*.img of=/dev/sdX bs=4M conv=fsync status=progress
 ```
 
-Then, to set up Wi-Fi, mount the card's FAT partition (`FIRMWARE`), copy
-`wifi.conf.example` to `wifi.conf` and edit SSID and password. The root
-partition grows to fill the card on first boot.
+### 3. Wi-Fi and SSH key
 
-## Boot
+Plug the card back into the PC. It has a small FAT partition called
+`FIRMWARE`, readable on any computer. Put two files there:
 
-Insert the card and power on. The A64 boot ROM tries the microSD before NAND.
+- **`wifi.conf`**: copy `wifi.conf.example` and fill in your network:
+  ```
+  network={
+      ssid="MyNetwork"
+      psk="MyPassword"
+  }
+  ```
+- **`authorized_keys`**: your SSH public key, e.g. a copy of
+  `~/.ssh/id_ed25519.pub`. Without it you can't log in over SSH.
 
-There's no serial console without opening the case, so:
+### 4. Boot
 
-- **Screen**: the DSI panel driver loads from the initrd, so kernel messages
-  should appear on the panel a few seconds after power-on. If the screen
-  stays black, look at the USB link next.
-- **USB**: connect the tablet's micro-USB port to a PC. The tablet runs
-  `g_ether`, the PC gets an address via DHCP, then `ssh root@10.42.0.1`.
-- **Wi-Fi**: `ssh root@irulu-x18.local` (mDNS), or look up the DHCP lease
-  on your router. `wifi.conf` must contain only `network={...}` blocks.
+Insert the card into the tablet and switch it on. The tablet's boot ROM
+prefers the SD card, so NixOS starts instead of Android. Boot messages
+appear on the screen after a few seconds; the first boot takes about
+2 minutes, because the root partition is grown to fill the card.
 
-SSH accepts the keys in `authorized_keys`. The console password for root
-is `irulu`.
+## Using it
 
-## What's in here
+### Logging in
 
-| File | Purpose |
-|------|---------|
-| `flake.nix` | Outputs; cross kernel/U-Boot plus native aarch64 system |
-| `configuration.nix` | Kernel config, initrd modules, SD layout, networking |
-| `patches/0001-irulu-x18-dts-and-panel.patch` | Adds `sun50i-a64-irulu-x18.dts` and the JD9365 panel entry. Regenerate it when `../mainline/*.dts` changes |
-| `firmware/silead/` | Touch firmware extracted from the vendor driver |
-| `wifi.conf.example`, `README-SDCARD.txt` | Copied to the FAT partition |
+- **Over Wi-Fi**: `ssh root@irulu-x18.local`
+- **Over USB**: connect the tablet's micro-USB port to your PC. A new
+  network interface appears on the PC; then `ssh root@10.42.0.1`.
+  If your PC doesn't pick up an address, use the IPv6 link-local address
+  (replace `usb0` with the name of the new interface):
+  ```sh
+  ping -6 -c2 ff02::1%usb0    # shows the tablet's fe80:: address
+  ssh root@fe80::...%usb0
+  ```
+- **On the tablet**: with a USB keyboard on an OTG adapter, log in as
+  `root`, password `irulu`. Change it with `passwd`.
 
-U-Boot is the stock nixpkgs `ubootPine64` (`pine64_plus_defconfig`). Its A64
-defaults (DDR3-1333, 672 MHz, ZQ 0x3b3bbb, ODT on, PMIC left at power-on
-defaults) match the vendor DRAM settings. It uses its own Pine64+ DT; the
-kernel gets the X18 DT through `extlinux.conf`.
+### Power button
 
-## Bring-up findings
+- Short press: suspend (deep sleep); press again to wake up
+- Long press: power off
 
-| Symptom | Cause | Fix |
-|---------|-------|-----|
-| No USB gadget | `usb_power_supply` disabled, so usbphy deferred forever | Enabled in DTS |
-| No USB gadget (2) | `ehci0`/`ohci0` share PHY 0 with MUSB; probing them switches the port to host mode | Left disabled; `usb_otg` forced to `peripheral` |
-| No Wi-Fi | `mmc-pwrseq-simple` fails on 6.18 with a single reset GPIO (`-ENOENT`) | WL_REG_ON (PL2) as `regulator-fixed` vmmc |
-| Black panel, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `mode_flags` per Jadard panel desc |
-| Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
-| Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
-| Wi-Fi associates rarely (`ASSOC-REJECT status_code=1`) | r8723bs "inactive power save" turns the RF off while unassociated; associations then fail ~90% of the time | `rtw_ips_mode=0` |
-| Wi-Fi uncalibrated, random MAC | Android replaces the module's eFuse with `wifi_efuse_8723bs_vq0.map` (antenna on S0/path B, TX power, BT coexistence) | `patches/0003` adds `rtw_efuse_file`; map converted to binary firmware; `rtw_initmac=<factory MAC>` |
-| SDL/GBM: `DRM_IOCTL_MODE_CREATE_DUMB failed: Cannot allocate memory` | Lean config had no CMA pool; scanout buffers need contiguous memory | `CMA_SIZE_MBYTES=128` |
-| Only s2idle, no deep sleep | nixpkgs builds Allwinner U-Boot with `SCP=/dev/null` (no crust) | Build crust (or1k, libc-less GCC; newlib fails with GCC 15) and pass it as `SCP` |
-| First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |
-
-Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
-of the vendor's 424 Mbit/s; the panel doesn't mind. Vendor vs. mainline
-register dumps are in `../dump/regs/`.
-
-## Updating a running tablet
-
-After the first flash, deploy changes over the USB link instead of
-reflashing:
+### Graphics test
 
 ```sh
-./deploy.sh boot --reboot   # new kernel/DTB: install and reboot
-./deploy.sh switch          # userspace-only changes, no reboot
-```
-
-It finds the tablet's IPv6 link-local address on the USB interface and runs
-`nixos-rebuild --target-host` through a temporary SSH host alias.
-
-## Graphics (KMS/DRM, no display server)
-
-Mesa's `lima` renders on the Mali-400; `kmsro` pairs it with the
-display-only `sun4i-drm`. SDL2 (sdl2-compat on SDL3) uses its KMSDRM
-backend:
-
-```sh
-SDL_VIDEODRIVER=kmsdrm sdl2-kms-test 20   # GLES2 triangle + touch squares
+SDL_VIDEODRIVER=kmsdrm sdl2-kms-test 20   # spinning triangle, white squares under your fingers
 kmscube
-eglinfo -p gbm
 ```
 
-Expect OpenGL ES 2.0 on `Mali400` and a vsync-locked 64 fps: the DSI link
-runs at 500 Mbit/s (A64 `pll-mipi` minimum) instead of the vendor's
-424 Mbit/s, so the panel refreshes at 64 Hz rather than the nominal 54 Hz.
+This uses the GPU directly through KMS/DRM, without X11 or Wayland.
 
-## Suspend
+### Back to Android
 
-U-Boot is built with **crust** (firmware for the A64's AR100 management
-core, `pkgs/crust`), so `/sys/power/mem_sleep` offers `deep` (suspend to
-RAM) instead of only `s2idle`. A short power-key press suspends, another
-press wakes, a long press powers off. The RTC also wakes it
-(`rtcwake -m mem -s 20`). After resume, wpa_supplicant is restarted.
+Switch off, remove the SD card, switch on.
 
-U-Boot sits in the raw SD area, which `nixos-rebuild` doesn't update. After
-changing U-Boot, run `irulu-install-uboot` on the tablet (it keeps a backup
-of the old boot area in `/root`). The pre-crust U-Boot is in
-`../dump/uboot-backup/` for recovery from a PC:
-`dd if=uboot-before-crust.bin of=/dev/sdX bs=1024 seek=8 conv=fsync`.
+## Updating
 
-## Debugging over USB
-
-The host may not get a DHCP lease, but IPv6 link-local always works:
+After changing the configuration, update the running tablet over USB or
+Wi-Fi instead of reflashing:
 
 ```sh
-ping -6 -c2 ff02::1%enp2s0f0u9     # find the tablet's fe80:: address
-ssh root@fe80::...%enp2s0f0u9
+./deploy.sh switch            # most changes
+./deploy.sh boot --reboot     # kernel or device tree changes
 ```
 
-`../tools/` has small out-of-tree modules for DSI experiments
-(`dsidbg`, `paneldbg`, `dsihost`); build them against
-`.#kernel`'s `dev` output with the cross compiler.
+`deploy.sh` finds the tablet on the USB link, or as `irulu-x18.local` on
+Wi-Fi, and runs `nixos-rebuild` against it.
 
-## Lean kernel (prepared, not wired in yet)
+The bootloader (U-Boot) is not updated by `nixos-rebuild`. If it changed,
+run `irulu-install-uboot` on the tablet; it saves a backup of the old one
+in `/root`.
 
-The nixpkgs generic kernel builds ~7,400 modules for hardware this tablet
-doesn't have. `kernel/x18-lean.fragment` lists only what the X18 and
-NixOS/systemd need. `kernel/x18-lean.config` is generated from it
-(about 1,240 `=y`, 200 `=m`).
+## Using it in your own configuration
 
-To regenerate it after editing the fragment (from an unpacked 6.18 tree):
+The hardware support is a NixOS module:
+
+```nix
+{
+  inputs.irulu-x18.url = "<this repository>";
+
+  outputs = { nixpkgs, irulu-x18, ... }: {
+    nixosConfigurations.mytablet = nixpkgs.lib.nixosSystem {
+      modules = [
+        irulu-x18.nixosModules.default
+        {
+          hardware.irulu-x18.enable = true;
+          # Cross-compile kernel and U-Boot on your x86_64 PC (recommended)
+          hardware.irulu-x18.kernelBuildPlatform = "x86_64-linux";
+          # Optional: fixed Wi-Fi MAC address, see below
+          # hardware.irulu-x18.wifiMacAddress = "02:12:34:56:78:9a";
+        }
+        ./configuration.nix
+      ];
+    };
+  };
+}
+```
+
+| Option | Default | |
+|---|---|---|
+| `hardware.irulu-x18.enable` | `false` | Enable hardware support |
+| `hardware.irulu-x18.kernelBuildPlatform` | `null` | Build kernel, DTB and U-Boot on this platform (e.g. `"x86_64-linux"`); `null` builds natively |
+| `hardware.irulu-x18.leanKernel` | `true` | Minimal kernel config (builds in minutes) instead of the generic nixpkgs kernel |
+| `hardware.irulu-x18.wifiMacAddress` | `null` | Wi-Fi MAC address; `null` derives a stable one from `/etc/machine-id` |
+
+The Wi-Fi module has no MAC address of its own. Android reads the factory
+MAC from its *private* partition (`ULI/factory/mac.txt`); set it with
+`wifiMacAddress` if you want the tablet to keep the same address as under
+Android.
+
+`configuration.nix` in this repository is the example system used for the
+SD card image (networking, SSH, test tools).
+
+## Known issues
+
+- **Wi-Fi** is 2.4 GHz only (hardware). The driver (`r8723bs`) is from the
+  kernel's staging area.
+- **Refresh rate** is 64 Hz instead of the panel's nominal 54 Hz; mainline
+  can't clock the display link as low as the vendor kernel. No visible
+  problem.
+- **SD card errors** (`sunxi-mmc ... data error`) appear under heavy writes
+  with some cards.
+- **Not supported yet**: microphone, accelerometer (screen rotation),
+  cameras, headphone jack detection.
+- **No serial console** without opening the case. During boot, `dmesg` is
+  written to `dmesg-initrd.txt` and `dmesg-stage2.txt` on the `FIRMWARE`
+  partition, so early failures can be read on a PC.
+
+## How it works
+
+| Part | |
+|---|---|
+| `modules/irulu-x18.nix` | Hardware support (kernel, device tree, firmware, U-Boot, Wi-Fi, audio, power) |
+| `configuration.nix` | Example system for the SD card image |
+| `dts/sun50i-a64-irulu-x18.dts` | Device tree for the board |
+| `patches/` | Kernel patches (panel, touchscreen, Wi-Fi calibration) |
+| `kernel/` | Lean kernel config and the fragment it is generated from |
+| `pkgs/crust/` | crust firmware for deep sleep |
+| `firmware/` | Touchscreen firmware and Wi-Fi calibration data from the stock Android |
+| `pkgs/sdl2-kms-test/` | Small SDL2/OpenGL ES test program |
+
+### What needed fixing
+
+| Problem | Cause | Fix |
+|---|---|---|
+| Panel black, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `patches/0001`: JD9365 entry with per-panel `mode_flags` |
+| Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
+| Touch coordinates off | The firmware reports 0..1151 × 35..1698, not 800×1280 | Ranges in the device tree |
+| Wi-Fi rarely associates (`ASSOC-REJECT status_code=1`) | `r8723bs` "inactive power save" turns the radio off while unassociated | `rtw_ips_mode=0` |
+| Wi-Fi uncalibrated | Android replaces the module's eFuse with `wifi_efuse_8723bs_vq0.map` (antenna path B, TX power, BT coexistence) | `patches/0003` adds `rtw_efuse_file` |
+| No USB gadget | `usb_power_supply` disabled; `ehci0`/`ohci0` share PHY 0 and switch it to host mode | Enabled / disabled in the device tree |
+| No Wi-Fi power-up | `mmc-pwrseq-simple` fails on 6.18 with a single reset GPIO | WL_REG_ON as `regulator-fixed` |
+| Only s2idle, no deep sleep | nixpkgs builds Allwinner U-Boot without crust | crust built with the libc-less or1k GCC (newlib fails with GCC 15) |
+| Lean kernel died after seconds | `allnoconfig` also disabled the A64 timer erratum and CPU errata | Config generated from `alldefconfig` |
+| GPU scanout fails (`CREATE_DUMB ... Cannot allocate memory`) | No CMA pool | `CMA_SIZE_MBYTES=128` |
+| Battery could deep-discharge | PMIC power-off at 2.6 V by default | `simple-battery` node: 3.3 V, 4000 mAh |
+
+### Lean kernel
+
+The generic nixpkgs kernel builds about 7,400 modules for hardware this
+tablet doesn't have. `kernel/x18-lean.fragment` lists only what the tablet
+and NixOS need; `kernel/x18-lean.config` (about 1,240 `=y`, 200 `=m`) is
+generated from it. To regenerate after editing the fragment, in an
+unpacked Linux 6.18 source tree:
 
 ```sh
 make ARCH=arm64 CROSS_COMPILE=aarch64-unknown-linux-gnu- \
-     KCONFIG_ALLCONFIG=.../kernel/x18-lean.fragment alldefconfig
-python3 .../kernel/check-lean-config.py .../kernel/x18-lean.fragment .config
-cp .config .../kernel/x18-lean.config
+     KCONFIG_ALLCONFIG=/path/to/kernel/x18-lean.fragment alldefconfig
+python3 /path/to/kernel/check-lean-config.py /path/to/kernel/x18-lean.fragment .config
+cp .config /path/to/kernel/x18-lean.config
 ```
 
-`check-lean-config.py` lists fragment options that Kconfig silently dropped
-(usually a missing parent menu). The next step is building it with
-`linuxManualConfig { configfile = ./kernel/x18-lean.config; }` instead of
-`linux_6_18.override`.
+`check-lean-config.py` lists options Kconfig silently dropped (usually a
+missing parent menu). Use `alldefconfig`, not `allnoconfig`: the latter
+also turns off default-on safety options like CPU errata workarounds.
 
-## Known unknowns
+### Firmware files
 
-- Backlight PWM polarity (`PWM_POLARITY_INVERTED`) works but hasn't been
-  checked against brightness levels.
-- SD card: `sunxi-mmc data error` messages under heavy writes.
+`firmware/` contains two files taken from the tablet's stock Android
+system, needed for the hardware to work:
+
+- `silead/gsl1680-irulu-x18.fw`: touch controller firmware, extracted from
+  the vendor's `gslX680new.ko` (`GSL1680E_86OGS_FW`)
+- `rtl8723bs/rtl8723bs_efuse_irulu_x18.bin`: Wi-Fi calibration data,
+  `/system/etc/wifi/wifi_efuse_8723bs_vq0.map` converted to binary
+
+All other firmware comes from `linux-firmware`.

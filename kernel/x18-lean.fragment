@@ -1,6 +1,6 @@
 # Lean kernel config fragment for the iRULU X18 (Allwinner A64).
 # Applied on top of `alldefconfig` (NOT allnoconfig: that also turns off
-# default-y safety options like CPU errata workarounds); see ../README.md "Lean kernel".
+# default-y safety options like CPU errata workarounds); see README.md "Lean kernel".
 # Built-in (=y): everything needed to boot to the root fs and show the
 # console. Modules (=m): things loaded later by udev/systemd.
 

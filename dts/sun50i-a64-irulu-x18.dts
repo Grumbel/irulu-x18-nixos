@@ -1,13 +1,11 @@
 // SPDX-License-Identifier: (GPL-2.0+ OR MIT)
 /*
- * iRULU X18 8" tablet (Allwinner A64, AXP803, JD9365 MIPI-DSI panel,
- * Silead GSL1680 touch, RTL8723BS Wi-Fi/BT)
+ * iRULU X18 8" tablet, sold as "iRULU eXpro X1S" (Allwinner A64, AXP803,
+ * JD9365 MIPI-DSI panel, Silead GSL touch, RTL8723BS Wi-Fi/BT)
  *
- * DRAFT - UNTESTED. Derived from the vendor Android 3.10 BSP device tree
- * (dump/dt/sun50iw1p1-irulu-x18-android.dts) and runtime state of the
- * stock firmware. Lines marked TODO need verification on hardware.
- *
- * Copy into arch/arm64/boot/dts/allwinner/ and add to the Makefile.
+ * Derived from the vendor's Android 5.1 (Linux 3.10 BSP) device tree and
+ * the runtime state of the stock firmware. Remaining TODOs are untested
+ * parts (accelerometer, cameras, keys).
  */
 
 /dts-v1/;
@@ -46,7 +44,7 @@
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		/* BSP: lcd_pwm_ch=0, lcd_pwm_freq=50000 Hz, lcd_pwm_pol=1 */
-		pwms = <&pwm 0 20000 PWM_POLARITY_INVERTED>; /* TODO: verify polarity */
+		pwms = <&pwm 0 20000 PWM_POLARITY_INVERTED>;
 		enable-gpios = <&pio 3 23 GPIO_ACTIVE_HIGH>; /* PD23 lcd_bl_en */
 		brightness-levels = <0 1000>;
 		num-interpolated-steps = <1000>;
