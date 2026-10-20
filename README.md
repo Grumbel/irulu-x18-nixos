@@ -72,7 +72,8 @@ kernel gets the X18 DT through `extlinux.conf`.
 | Black panel, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `mode_flags` per Jadard panel desc |
 | Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
 | Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
-| Wi-Fi scans but never associates (`ASSOC-REJECT status_code=1`) | RTL8723BS-VQ0 has an empty eFuse; Android loads `wifi_efuse_8723bs_vq0.map` instead. Mainline defaults to antenna path S1, the antenna is on S0 (map byte `0xC3 = 0x51`), so TX doesn't work | `patches/0003` adds `rtw_ant_path`; `options r8723bs rtw_ant_path=1 rtw_initmac=<factory MAC>` |
+| Wi-Fi associates rarely (`ASSOC-REJECT status_code=1`) | r8723bs "inactive power save" turns the RF off while unassociated; associations then fail ~90% of the time | `rtw_ips_mode=0` |
+| Wi-Fi uncalibrated, random MAC | Android replaces the module's eFuse with `wifi_efuse_8723bs_vq0.map` (antenna on S0/path B, TX power, BT coexistence) | `patches/0003` adds `rtw_efuse_file`; map converted to binary firmware; `rtw_initmac=<factory MAC>` |
 | SDL/GBM: `DRM_IOCTL_MODE_CREATE_DUMB failed: Cannot allocate memory` | Lean config had no CMA pool; scanout buffers need contiguous memory | `CMA_SIZE_MBYTES=128` |
 | Only s2idle, no deep sleep | nixpkgs builds Allwinner U-Boot with `SCP=/dev/null` (no crust) | Build crust (or1k, libc-less GCC; newlib fails with GCC 15) and pass it as `SCP` |
 | First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |

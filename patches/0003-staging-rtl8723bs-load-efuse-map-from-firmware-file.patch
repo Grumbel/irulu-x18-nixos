@@ -1,0 +1,69 @@
+diff -ruN a/drivers/staging/rtl8723bs/hal/sdio_halinit.c b/drivers/staging/rtl8723bs/hal/sdio_halinit.c
+--- a/drivers/staging/rtl8723bs/hal/sdio_halinit.c	2026-10-15 11:58:20.000000000 +0200
++++ b/drivers/staging/rtl8723bs/hal/sdio_halinit.c	2026-10-20 21:37:27.343517224 +0200
+@@ -4,6 +4,7 @@
+  * Copyright(c) 2007 - 2012 Realtek Corporation. All rights reserved.
+  *
+  ******************************************************************************/
++#include <linux/firmware.h>
+ #include <drv_types.h>
+ #include <rtl8723b_hal.h>
+ 
+@@ -1042,6 +1043,49 @@
+ 		pHalData->BoardType = 0;
+ }
+ 
++/*
++ * Some modules (e.g. RTL8723BS-VQ0) ship with a blank eFuse; their vendor
++ * driver loads the logical eFuse map from a file instead. Without it the
++ * driver runs uncalibrated (TX power, antenna path, BT coexistence).
++ */
++static char *rtw_efuse_file;
++module_param(rtw_efuse_file, charp, 0444);
++MODULE_PARM_DESC(rtw_efuse_file, "Firmware file with the logical eFuse map, replaces the eFuse content");
++
++static void _LoadEfuseFile8723BS(struct adapter *padapter, u8 *hwinfo)
++{
++	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(padapter);
++	struct device *device = dvobj_to_dev(padapter->dvobj);
++	const struct firmware *fw;
++
++	if (!rtw_efuse_file)
++		return;
++
++	/*
++	 * The VQ0 eFuse autoloads fine but is blank (0xFF), so don't rely on
++	 * bautoload_fail_flag: an explicitly configured file always wins.
++	 */
++	dev_info(device, "rtl8723bs: eFuse autoload %s, ID %02x%02x, replacing with %s\n",
++		 pEEPROM->bautoload_fail_flag ? "failed" : "ok",
++		 hwinfo[1], hwinfo[0], rtw_efuse_file);
++
++	if (request_firmware(&fw, rtw_efuse_file, device)) {
++		dev_warn(device, "rtl8723bs: eFuse file %s not found\n", rtw_efuse_file);
++		return;
++	}
++
++	if (fw->size < 2 || fw->size > EFUSE_MAP_LEN_8723B) {
++		dev_warn(device, "rtl8723bs: eFuse file %s has bad size %zu\n",
++			 rtw_efuse_file, fw->size);
++	} else {
++		memset(hwinfo, 0xFF, EFUSE_MAP_LEN_8723B);
++		memcpy(hwinfo, fw->data, fw->size);
++		pEEPROM->bautoload_fail_flag = false;
++		dev_info(device, "rtl8723bs: using eFuse map from %s\n", rtw_efuse_file);
++	}
++	release_firmware(fw);
++}
++
+ static void _ReadEfuseInfo8723BS(struct adapter *padapter)
+ {
+ 	struct eeprom_priv *pEEPROM = GET_EEPROM_EFUSE_PRIV(padapter);
+@@ -1054,6 +1098,7 @@
+ 	hwinfo = pEEPROM->efuse_eeprom_data;
+ 
+ 	Hal_InitPGData(padapter, hwinfo);
++	_LoadEfuseFile8723BS(padapter, hwinfo);
+ 
+ 	Hal_EfuseParseIDCode(padapter, hwinfo);
+ 	Hal_EfuseParseEEPROMVer_8723B(padapter, hwinfo, pEEPROM->bautoload_fail_flag);

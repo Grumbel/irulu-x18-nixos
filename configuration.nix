@@ -13,10 +13,10 @@ let
     patch = ./patches/0002-input-silead-tolerate-reset-command-bus-error.patch;
   };
 
-  rtl8723bsPatch = {
-    # Module parameter to select the antenna path when the eFuse is empty
-    name = "rtl8723bs-ant-path";
-    patch = ./patches/0003-staging-rtl8723bs-add-rtw_ant_path-parameter.patch;
+  rtl8723bsEfusePatch = {
+    # Load the logical eFuse map from a firmware file (empty eFuse on VQ0)
+    name = "rtl8723bs-efuse-file";
+    patch = ./patches/0003-staging-rtl8723bs-load-efuse-map-from-firmware-file.patch;
   };
 
   # Lean kernel: only the drivers this tablet needs (kernel/x18-lean.config,
@@ -25,12 +25,12 @@ let
     inherit (crossPkgs.linux_6_18) src version;
     modDirVersion = "${crossPkgs.linux_6_18.version}-irulu";
     configfile = ./kernel/x18-lean.config;
-    kernelPatches = [ panelPatch sileadPatch rtl8723bsPatch ];
+    kernelPatches = [ panelPatch sileadPatch rtl8723bsEfusePatch ];
   };
 
   # Fallback: the generic nixpkgs kernel (~7400 modules, slow to build)
   genericKernel = crossPkgs.linux_6_18.override (old: {
-    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch sileadPatch rtl8723bsPatch ];
+    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch sileadPatch rtl8723bsEfusePatch ];
     # The stock nixpkgs aarch64 config already has the A64 display, panel,
     # touch, PMIC, audio, RTL8723BS and MUSB gadget drivers; only Realtek
     # Bluetooth over UART is missing.
@@ -69,6 +69,7 @@ let
     cp -L $fw/rtlwifi/rtl8723bs_nic.bin* $out/lib/firmware/rtlwifi/
     cp -L $fw/rtl_bt/rtl8723bs_* $out/lib/firmware/rtl_bt/
     cp ${./firmware/silead/gsl1680-irulu-x18.fw} $out/lib/firmware/silead/gsl1680-irulu-x18.fw
+    cp ${./firmware/rtl8723bs/rtl8723bs_efuse_irulu_x18.bin} $out/lib/firmware/rtlwifi/rtl8723bs_efuse_irulu_x18.bin
   '';
 
   crust = crossPkgs.buildPackages.callPackage ./pkgs/crust {
@@ -208,13 +209,17 @@ in
     # Wi-Fi: no networks are declared, so wpa_supplicant reads
     # /etc/wpa_supplicant/imperative.conf, which is seeded from
     # wifi.conf on the FAT partition.
-    # The RTL8723BS-VQ0 module has an empty eFuse (Android loads
-    # /system/etc/wifi/wifi_efuse_8723bs_vq0.map instead). Without it the
-    # driver picks the wrong antenna path (no TX) and a random MAC.
-    # From that map: 0xC3 = 0x51 -> single antenna on S0 (path B).
-    # MAC: factory address from the Android "private" partition.
+    # Wi-Fi (RTL8723BS-VQ0):
+    # - rtw_ips_mode=0: with "inactive power save" the driver turns the RF
+    #   off while unassociated and associations then fail ~90% of the time
+    #   (ASSOC-REJECT status_code=1). This was the main Wi-Fi problem.
+    # - rtw_efuse_file: like Android, replace the chip's eFuse with the
+    #   vendor map (/system/etc/wifi/wifi_efuse_8723bs_vq0.map, converted to
+    #   binary; patches/0003): calibrated TX power, antenna on S0/path B
+    #   (0xC3 = 0x51; path A doesn't connect at all), BT coexistence.
+    # - rtw_initmac: factory MAC from the Android "private" partition.
     boot.extraModprobeConfig = ''
-      options r8723bs rtw_ant_path=1 rtw_initmac=XX:XX:XX:XX:XX:XX
+      options r8723bs rtw_ips_mode=0 rtw_efuse_file=rtlwifi/rtl8723bs_efuse_irulu_x18.bin rtw_initmac=XX:XX:XX:XX:XX:XX
     '';
 
     networking.wireless = {
