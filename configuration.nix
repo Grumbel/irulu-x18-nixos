@@ -268,6 +268,29 @@ in
     # Rotate the console to landscape: fbcon=rotate:1
     # boot.kernelParams = [ "fbcon=rotate:1" ];
 
+    # Audio: all mixer controls default to muted. Route AIF1 -> DAC ->
+    # Line Out (internal speaker amp, PH7) and Headphone.
+    systemd.services.irulu-audio-defaults = {
+      description = "Set ALSA mixer defaults for the X18 codec";
+      wantedBy = [ "sound.target" ];
+      after = [ "sound.target" ];
+      serviceConfig.Type = "oneshot";
+      path = [ pkgs.alsa-utils ];
+      script = ''
+        for i in $(seq 20); do [ -e /dev/snd/controlC0 ] && break; sleep 1; done
+        a="amixer -q -c0 set"
+        $a "AIF1 Slot 0 Digital DAC" on
+        $a "AIF1 DA0" 80%
+        $a "DAC" on
+        $a "DAC" 100%
+        $a "Line Out" on
+        $a "Line Out" 80%
+        $a "Headphone Source" DAC
+        $a "Headphone" on
+        $a "Headphone" 60%
+      '';
+    };
+
     # Mesa: lima (Mali-400 GPU) + kmsro for the display-only sun4i-drm
     hardware.graphics.enable = true;
 
@@ -276,6 +299,7 @@ in
       kmscube
       libdrm # modetest
       mesa-demos # eglinfo
+      alsa-utils # amixer, aplay, speaker-test
       evtest
       i2c-tools
       iw
