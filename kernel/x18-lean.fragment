@@ -76,6 +76,10 @@ CONFIG_CRYPTO_GHASH_ARM64_CE=y
 CONFIG_BLK_DEV=y
 CONFIG_ZRAM=m
 CONFIG_SWAP=y
+# Contiguous memory for scanout buffers (DRM dumb/GBM) and the video engine
+CONFIG_CMA=y
+CONFIG_DMA_CMA=y
+CONFIG_CMA_SIZE_MBYTES=128
 
 # --- SoC: Allwinner A64 ------------------------------------------------
 CONFIG_ARCH_SUNXI=y

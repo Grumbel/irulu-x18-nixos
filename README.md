@@ -73,6 +73,7 @@ kernel gets the X18 DT through `extlinux.conf`.
 | Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
 | Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
 | Wi-Fi scans but never associates (`ASSOC-REJECT status_code=1`) | RTL8723BS-VQ0 has an empty eFuse; Android loads `wifi_efuse_8723bs_vq0.map` instead. Mainline defaults to antenna path S1, the antenna is on S0 (map byte `0xC3 = 0x51`), so TX doesn't work | `patches/0003` adds `rtw_ant_path`; `options r8723bs rtw_ant_path=1 rtw_initmac=<factory MAC>` |
+| SDL/GBM: `DRM_IOCTL_MODE_CREATE_DUMB failed: Cannot allocate memory` | Lean config had no CMA pool; scanout buffers need contiguous memory | `CMA_SIZE_MBYTES=128` |
 | First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |
 
 Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
@@ -91,6 +92,22 @@ reflashing:
 
 It finds the tablet's IPv6 link-local address on the USB interface and runs
 `nixos-rebuild --target-host` through a temporary SSH host alias.
+
+## Graphics (KMS/DRM, no display server)
+
+Mesa's `lima` renders on the Mali-400; `kmsro` pairs it with the
+display-only `sun4i-drm`. SDL2 (sdl2-compat on SDL3) uses its KMSDRM
+backend:
+
+```sh
+SDL_VIDEODRIVER=kmsdrm sdl2-kms-test 20   # GLES2 triangle + touch squares
+kmscube
+eglinfo -p gbm
+```
+
+Expect OpenGL ES 2.0 on `Mali400` and a vsync-locked 64 fps: the DSI link
+runs at 500 Mbit/s (A64 `pll-mipi` minimum) instead of the vendor's
+424 Mbit/s, so the panel refreshes at 64 Hz rather than the nominal 54 Hz.
 
 ## Debugging over USB
 

@@ -268,7 +268,14 @@ in
     # Rotate the console to landscape: fbcon=rotate:1
     # boot.kernelParams = [ "fbcon=rotate:1" ];
 
+    # Mesa: lima (Mali-400 GPU) + kmsro for the display-only sun4i-drm
+    hardware.graphics.enable = true;
+
     environment.systemPackages = with pkgs; [
+      (callPackage ./pkgs/sdl2-kms-test { })
+      kmscube
+      libdrm # modetest
+      mesa-demos # eglinfo
       evtest
       i2c-tools
       iw
