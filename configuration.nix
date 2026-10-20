@@ -1,14 +1,24 @@
 { config, lib, pkgs, modulesPath, crossPkgs, ... }:
 
 let
-  kernel = crossPkgs.linux_6_18.override (old: {
-    kernelPatches = (old.kernelPatches or [ ]) ++ [
-      {
-        # JD9365 panel entry for the X18 (non-burst video mode)
-        name = "irulu-x18";
-        patch = ./patches/0001-drm-panel-jadard-add-iRULU-X18-panel.patch;
-      }
-    ];
+  panelPatch = {
+    # JD9365 panel entry for the X18 (non-burst video mode)
+    name = "irulu-x18";
+    patch = ./patches/0001-drm-panel-jadard-add-iRULU-X18-panel.patch;
+  };
+
+  # Lean kernel: only the drivers this tablet needs (kernel/x18-lean.config,
+  # generated from kernel/x18-lean.fragment). Builds in minutes.
+  leanKernel = crossPkgs.linuxManualConfig {
+    inherit (crossPkgs.linux_6_18) src version;
+    modDirVersion = "${crossPkgs.linux_6_18.version}-irulu";
+    configfile = ./kernel/x18-lean.config;
+    kernelPatches = [ panelPatch ];
+  };
+
+  # Fallback: the generic nixpkgs kernel (~7400 modules, slow to build)
+  genericKernel = crossPkgs.linux_6_18.override (old: {
+    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch ];
     # The stock nixpkgs aarch64 config already has the A64 display, panel,
     # touch, PMIC, audio, RTL8723BS and MUSB gadget drivers; only Realtek
     # Bluetooth over UART is missing.
@@ -17,6 +27,8 @@ let
       BT_HCIUART_3WIRE = yes;
     };
   });
+
+  kernel = leanKernel;
 
   # The board DTB is built on its own from ./dts, so DT changes don't need a
   # kernel rebuild.
@@ -105,6 +117,41 @@ in
       "panic=60"
     ];
     boot.consoleLogLevel = 7;
+
+    # Boot logger: without a serial console, early failures leave no trace,
+    # so dump dmesg to the FAT partition (readable on any PC) during boot.
+    boot.initrd.systemd.extraBin.dmesg = "${pkgs.util-linux}/bin/dmesg";
+    boot.initrd.systemd.services.irulu-bootlog = {
+      description = "Write dmesg to the FIRMWARE partition";
+      wantedBy = [ "initrd.target" ];
+      unitConfig.DefaultDependencies = false;
+      script = ''
+        while [ ! -e /dev/disk/by-label/FIRMWARE ]; do sleep 1; done
+        mkdir -p /run/bootlog
+        mount -t vfat /dev/disk/by-label/FIRMWARE /run/bootlog
+        while true; do
+          dmesg > /run/bootlog/dmesg-initrd.txt
+          sync
+          sleep 2
+        done
+      '';
+    };
+    systemd.services.irulu-bootlog = {
+      description = "Write dmesg to the FIRMWARE partition for the first minutes";
+      wantedBy = [ "sysinit.target" ];
+      unitConfig = {
+        DefaultDependencies = false;
+        RequiresMountsFor = "/boot/firmware";
+      };
+      path = [ pkgs.util-linux pkgs.coreutils ];
+      script = ''
+        for i in $(seq 90); do
+          dmesg > /boot/firmware/dmesg-stage2.txt
+          sync
+          sleep 2
+        done
+      '';
+    };
 
     hardware.firmware = [ boardFirmware ];
     hardware.enableRedistributableFirmware = lib.mkForce false;

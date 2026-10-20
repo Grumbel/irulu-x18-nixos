@@ -1,5 +1,6 @@
 # Lean kernel config fragment for the iRULU X18 (Allwinner A64).
-# Applied on top of `allnoconfig`; see ../README.md "Lean kernel".
+# Applied on top of `alldefconfig` (NOT allnoconfig: that also turns off
+# default-y safety options like CPU errata workarounds); see ../README.md "Lean kernel".
 # Built-in (=y): everything needed to boot to the root fs and show the
 # console. Modules (=m): things loaded later by udev/systemd.
 
@@ -78,6 +79,15 @@ CONFIG_SWAP=y
 
 # --- SoC: Allwinner A64 ------------------------------------------------
 CONFIG_ARCH_SUNXI=y
+# A64 arch timer is broken without this (random hangs)
+CONFIG_SUN50I_ERRATUM_UNKNOWN1=y
+CONFIG_ARM64_ERRATUM_843419=y
+CONFIG_ARM64_ERRATUM_845719=y
+CONFIG_WATCHDOG_HANDLE_BOOT_ENABLED=y
+CONFIG_MAILBOX=y
+CONFIG_SUN6I_MSGBOX=y
+CONFIG_HWSPINLOCK=y
+CONFIG_HWSPINLOCK_SUN6I=m
 CONFIG_SMP=y
 CONFIG_NR_CPUS=4
 CONFIG_ARM64_VA_BITS_39=y

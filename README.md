@@ -106,13 +106,13 @@ ssh root@fe80::...%enp2s0f0u9
 The nixpkgs generic kernel builds ~7,400 modules for hardware this tablet
 doesn't have. `kernel/x18-lean.fragment` lists only what the X18 and
 NixOS/systemd need. `kernel/x18-lean.config` is generated from it
-(about 900 `=y`, 180 `=m`).
+(about 1,240 `=y`, 200 `=m`).
 
 To regenerate it after editing the fragment (from an unpacked 6.18 tree):
 
 ```sh
 make ARCH=arm64 CROSS_COMPILE=aarch64-unknown-linux-gnu- \
-     KCONFIG_ALLCONFIG=.../kernel/x18-lean.fragment allnoconfig
+     KCONFIG_ALLCONFIG=.../kernel/x18-lean.fragment alldefconfig
 python3 .../kernel/check-lean-config.py .../kernel/x18-lean.fragment .config
 cp .config .../kernel/x18-lean.config
 ```
