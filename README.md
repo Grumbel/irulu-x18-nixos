@@ -47,9 +47,8 @@ See [Known issues](#known-issues) for details.
 
 ## What you need
 
-- A **microSD card**, 8 GB or larger (the image is about 4 GB; a good brand,
-  cheap cards show I/O
-  errors under load)
+- A **microSD card**, 8 GB or larger (the image is about 4 GB). Use a good
+  brand; cheap cards show I/O errors under load.
 - A **Linux PC with [Nix](https://nixos.org/download/)** and flakes enabled
 - To build on an x86_64 PC: aarch64 emulation. On NixOS:
   `boot.binfmt.emulatedSystems = [ "aarch64-linux" ];`
