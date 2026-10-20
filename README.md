@@ -70,6 +70,9 @@ kernel gets the X18 DT through `extlinux.conf`.
 | No USB gadget (2) | `ehci0`/`ohci0` share PHY 0 with MUSB; probing them switches the port to host mode | Left disabled; `usb_otg` forced to `peripheral` |
 | No Wi-Fi | `mmc-pwrseq-simple` fails on 6.18 with a single reset GPIO (`-ENOENT`) | WL_REG_ON (PL2) as `regulator-fixed` vmmc |
 | Black panel, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `mode_flags` per Jadard panel desc |
+| Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
+| Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
+| First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |
 
 Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
 of the vendor's 424 Mbit/s; the panel doesn't mind. Vendor vs. mainline
@@ -124,8 +127,6 @@ cp .config .../kernel/x18-lean.config
 
 ## Known unknowns
 
-- Touchscreen: the GSL chip answers its ID (`0x80360000`), but the first
-  register write fails. Not solved yet.
 - Backlight PWM polarity (`PWM_POLARITY_INVERTED`) works but hasn't been
   checked against brightness levels.
 - SD card: `sunxi-mmc data error` messages under heavy writes.

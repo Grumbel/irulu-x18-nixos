@@ -7,18 +7,24 @@ let
     patch = ./patches/0001-drm-panel-jadard-add-iRULU-X18-panel.patch;
   };
 
+  sileadPatch = {
+    # GSL touch chip resets mid-transfer on the reset command
+    name = "silead-reset-bus-error";
+    patch = ./patches/0002-input-silead-tolerate-reset-command-bus-error.patch;
+  };
+
   # Lean kernel: only the drivers this tablet needs (kernel/x18-lean.config,
   # generated from kernel/x18-lean.fragment). Builds in minutes.
   leanKernel = crossPkgs.linuxManualConfig {
     inherit (crossPkgs.linux_6_18) src version;
     modDirVersion = "${crossPkgs.linux_6_18.version}-irulu";
     configfile = ./kernel/x18-lean.config;
-    kernelPatches = [ panelPatch ];
+    kernelPatches = [ panelPatch sileadPatch ];
   };
 
   # Fallback: the generic nixpkgs kernel (~7400 modules, slow to build)
   genericKernel = crossPkgs.linux_6_18.override (old: {
-    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch ];
+    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch sileadPatch ];
     # The stock nixpkgs aarch64 config already has the A64 display, panel,
     # touch, PMIC, audio, RTL8723BS and MUSB gadget drivers; only Realtek
     # Bluetooth over UART is missing.

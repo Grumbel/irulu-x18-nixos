@@ -1,0 +1,46 @@
+diff -ruN a/drivers/input/touchscreen/silead.c b/drivers/input/touchscreen/silead.c
+--- a/drivers/input/touchscreen/silead.c	2026-10-15 11:58:20.000000000 +0200
++++ b/drivers/input/touchscreen/silead.c	2026-10-20 19:26:06.919734193 +0200
+@@ -312,15 +312,27 @@
+ 	input_sync(input);
+ }
+ 
+-static int silead_ts_init(struct i2c_client *client)
++/*
++ * Some GSL chips (e.g. ID 0x80360000 on the iRULU X18) reset as soon as they
++ * latch the reset command, before the I2C transfer has completed. The
++ * controller reports that as a bus error even though the reset happened.
++ */
++static void silead_ts_write_reset(struct i2c_client *client)
+ {
+ 	int error;
+ 
+ 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_RESET,
+ 					  SILEAD_CMD_RESET);
+ 	if (error)
+-		goto i2c_write_err;
++		dev_dbg(&client->dev, "Ignoring reset command error %d\n", error);
+ 	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
++}
++
++static int silead_ts_init(struct i2c_client *client)
++{
++	int error;
++
++	silead_ts_write_reset(client);
+ 
+ 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_TOUCH_NR,
+ 					  SILEAD_MAX_FINGERS);
+@@ -351,11 +363,7 @@
+ {
+ 	int error;
+ 
+-	error = i2c_smbus_write_byte_data(client, SILEAD_REG_RESET,
+-					  SILEAD_CMD_RESET);
+-	if (error)
+-		goto i2c_write_err;
+-	usleep_range(SILEAD_CMD_SLEEP_MIN, SILEAD_CMD_SLEEP_MAX);
++	silead_ts_write_reset(client);
+ 
+ 	error = i2c_smbus_write_byte_data(client, SILEAD_REG_CLOCK,
+ 					  SILEAD_CLOCK);

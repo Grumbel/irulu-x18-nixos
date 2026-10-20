@@ -144,9 +144,14 @@
 		power-gpios = <&pio 7 8 GPIO_ACTIVE_HIGH>; /* PH8 ctp_wakeup */
 		vddio-supply = <&reg_ldo_io0>; /* vcc-ctp */
 		firmware-name = "gsl1680-irulu-x18.fw";
-		/* BSP: ctp_screen_max 800x1280 with ctp_exchange_x_y_flag=1 */
-		touchscreen-size-x = <1280>; /* TODO: verify */
-		touchscreen-size-y = <800>;
+		/*
+		 * Raw chip axes (before the swap), measured with evtest:
+		 * raw X = vertical 35..1698, raw Y = horizontal 0..1151.
+		 * The firmware doesn't scale to the 800x1280 panel.
+		 */
+		touchscreen-min-x = <35>;
+		touchscreen-size-x = <1699>;
+		touchscreen-size-y = <1152>;
 		touchscreen-swapped-x-y;
 		silead,max-fingers = <10>;
 	};
