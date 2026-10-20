@@ -33,6 +33,16 @@
 		stdout-path = "serial0:115200n8";
 	};
 
+	/* Values from the vendor sys_config (pmu0 node) */
+	battery: battery {
+		compatible = "simple-battery";
+		charge-full-design-microamp-hours = <4000000>;	/* pmu_battery_cap */
+		voltage-min-design-microvolt = <3300000>;	/* pmu_pwroff_vol */
+		voltage-max-design-microvolt = <4200000>;	/* pmu_init_chgvol */
+		constant-charge-current-max-microamp = <1800000>; /* pmu_suspend_chgcur */
+		constant-charge-voltage-max-microvolt = <4200000>;
+	};
+
 	backlight: backlight {
 		compatible = "pwm-backlight";
 		/* BSP: lcd_pwm_ch=0, lcd_pwm_freq=50000 Hz, lcd_pwm_pol=1 */
@@ -267,7 +277,7 @@
 };
 
 &battery_power_supply {
-	/* 4000 mAh, 4.2 V (pmu_battery_cap, pmu_init_chgvol) */
+	monitored-battery = <&battery>;
 	status = "okay";
 };
 
