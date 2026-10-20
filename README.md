@@ -61,7 +61,7 @@ See [Known issues](#known-issues) for details.
 ### 1. Build the SD card image
 
 ```sh
-git clone <this repository> irulu-x18-nixos
+git clone https://github.com/Grumbel/irulu-x18-nixos.git
 cd irulu-x18-nixos
 nix build .#sdImage -L
 ```
@@ -157,7 +157,7 @@ The hardware support is a NixOS module:
 
 ```nix
 {
-  inputs.irulu-x18.url = "<this repository>";
+  inputs.irulu-x18.url = "github:Grumbel/irulu-x18-nixos";
 
   outputs = { nixpkgs, irulu-x18, ... }: {
     nixosConfigurations.mytablet = nixpkgs.lib.nixosSystem {
@@ -219,6 +219,7 @@ SD card image (networking, SSH, test tools).
 | `pkgs/crust/` | crust firmware for deep sleep |
 | `firmware/` | Touchscreen firmware and Wi-Fi calibration data from the stock Android |
 | `pkgs/sdl2-kms-test/` | Small SDL2/OpenGL ES test program |
+| `tools/` | Firmware extraction from the stock Android |
 
 ### What needed fixing
 
@@ -257,12 +258,44 @@ also turns off default-on safety options like CPU errata workarounds.
 
 ### Firmware files
 
-`firmware/` contains two files taken from the tablet's stock Android
-system, needed for the hardware to work:
+`firmware/` contains two **binary blobs** taken from the tablet's stock
+Android 5.1 system. They are not covered by this repository's licenses;
+they are included because the hardware doesn't work properly without them:
 
-- `silead/gsl1680-irulu-x18.fw`: touch controller firmware, extracted from
-  the vendor's `gslX680new.ko` (`GSL1680E_86OGS_FW`)
-- `rtl8723bs/rtl8723bs_efuse_irulu_x18.bin`: Wi-Fi calibration data,
-  `/system/etc/wifi/wifi_efuse_8723bs_vq0.map` converted to binary
+| File | What | Source in Android |
+|---|---|---|
+| `silead/gsl1680-irulu-x18.fw` | Touch controller firmware | Array `GSL1680E_86OGS_FW` in the vendor touchscreen driver `/system/vendor/modules/gslX680new.ko` |
+| `rtl8723bs/rtl8723bs_efuse_irulu_x18.bin` | Wi-Fi calibration data (eFuse map: TX power, antenna, BT coexistence) | `/system/etc/wifi/wifi_efuse_8723bs_vq0.map`, hex text converted to binary |
 
 All other firmware comes from `linux-firmware`.
+
+To extract them yourself from your own tablet, boot Android, enable USB
+debugging (*Settings → About tablet*, tap *Build number* seven times, then
+*Developer options → USB debugging*), connect it via USB and run:
+
+```sh
+tools/extract-firmware.sh adb
+```
+
+Or from a copy of Android's `/system` directory (for example a mounted
+backup of the system partition):
+
+```sh
+tools/extract-firmware.sh dir /path/to/system
+```
+
+The script writes the files to `firmware-extracted/` and checks them
+against the SHA-256 sums of the files in `firmware/`.
+
+## License
+
+The files in this repository are dual-licensed under the
+[GNU GPL 2.0 or later](LICENSES/GPL-2.0.txt) or the [MIT license](LICENSES/MIT.txt),
+at your choice (`SPDX-License-Identifier: GPL-2.0-or-later OR MIT`),
+except for:
+
+- the kernel patches in `patches/` (GPL-2.0, like the kernel)
+- the generated kernel config `kernel/x18-lean.config` (GPL-2.0)
+- the binary blobs in `firmware/` (see [Firmware files](#firmware-files))
+
+See [LICENSE](LICENSE) for details.

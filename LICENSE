@@ -1,0 +1,26 @@
+irulu-x18-nixos licensing
+=========================
+
+Unless stated otherwise, the files in this repository are dual-licensed
+under the GNU General Public License version 2 or later, or the MIT
+license, at your choice:
+
+  SPDX-License-Identifier: GPL-2.0-or-later OR MIT
+
+Exceptions:
+
+  patches/*.patch                 GPL-2.0 (changes to the Linux kernel)
+  dts/sun50i-a64-irulu-x18.dts    GPL-2.0-or-later OR MIT (as in its header)
+  kernel/x18-lean.config          generated from the Linux kernel's Kconfig,
+                                  GPL-2.0
+  firmware/                       binary blobs from the tablet's stock
+                                  Android system, not covered by these
+                                  licenses; see "Firmware files" in
+                                  README.md
+
+License texts:
+
+  LICENSES/GPL-2.0.txt
+  LICENSES/MIT.txt
+
+Copyright (c) 2026 Ingo Ruhnke

@@ -2,3 +2,4 @@ result*
 # personal files, see wifi.conf.example and README.md
 wifi.conf
 authorized_keys
+firmware-extracted/
