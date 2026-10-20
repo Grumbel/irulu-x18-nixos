@@ -75,6 +75,19 @@ Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
 of the vendor's 424 Mbit/s; the panel doesn't mind. Vendor vs. mainline
 register dumps are in `../dump/regs/`.
 
+## Updating a running tablet
+
+After the first flash, deploy changes over the USB link instead of
+reflashing:
+
+```sh
+./deploy.sh boot --reboot   # new kernel/DTB: install and reboot
+./deploy.sh switch          # userspace-only changes, no reboot
+```
+
+It finds the tablet's IPv6 link-local address on the USB interface and runs
+`nixos-rebuild --target-host` through a temporary SSH host alias.
+
 ## Debugging over USB
 
 The host may not get a DHCP lease, but IPv6 link-local always works:
