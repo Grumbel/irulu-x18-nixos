@@ -74,6 +74,7 @@ kernel gets the X18 DT through `extlinux.conf`.
 | Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
 | Wi-Fi scans but never associates (`ASSOC-REJECT status_code=1`) | RTL8723BS-VQ0 has an empty eFuse; Android loads `wifi_efuse_8723bs_vq0.map` instead. Mainline defaults to antenna path S1, the antenna is on S0 (map byte `0xC3 = 0x51`), so TX doesn't work | `patches/0003` adds `rtw_ant_path`; `options r8723bs rtw_ant_path=1 rtw_initmac=<factory MAC>` |
 | SDL/GBM: `DRM_IOCTL_MODE_CREATE_DUMB failed: Cannot allocate memory` | Lean config had no CMA pool; scanout buffers need contiguous memory | `CMA_SIZE_MBYTES=128` |
+| Only s2idle, no deep sleep | nixpkgs builds Allwinner U-Boot with `SCP=/dev/null` (no crust) | Build crust (or1k, libc-less GCC; newlib fails with GCC 15) and pass it as `SCP` |
 | First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |
 
 Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
@@ -108,6 +109,20 @@ eglinfo -p gbm
 Expect OpenGL ES 2.0 on `Mali400` and a vsync-locked 64 fps: the DSI link
 runs at 500 Mbit/s (A64 `pll-mipi` minimum) instead of the vendor's
 424 Mbit/s, so the panel refreshes at 64 Hz rather than the nominal 54 Hz.
+
+## Suspend
+
+U-Boot is built with **crust** (firmware for the A64's AR100 management
+core, `pkgs/crust`), so `/sys/power/mem_sleep` offers `deep` (suspend to
+RAM) instead of only `s2idle`. A short power-key press suspends, another
+press wakes, a long press powers off. The RTC also wakes it
+(`rtcwake -m mem -s 20`). After resume, wpa_supplicant is restarted.
+
+U-Boot sits in the raw SD area, which `nixos-rebuild` doesn't update. After
+changing U-Boot, run `irulu-install-uboot` on the tablet (it keeps a backup
+of the old boot area in `/root`). The pre-crust U-Boot is in
+`../dump/uboot-backup/` for recovery from a PC:
+`dd if=uboot-before-crust.bin of=/dev/sdX bs=1024 seek=8 conv=fsync`.
 
 ## Debugging over USB
 

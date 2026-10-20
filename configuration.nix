@@ -71,7 +71,18 @@ let
     cp ${./firmware/silead/gsl1680-irulu-x18.fw} $out/lib/firmware/silead/gsl1680-irulu-x18.fw
   '';
 
-  uboot = crossPkgs.ubootPine64;
+  crust = crossPkgs.buildPackages.callPackage ./pkgs/crust {
+    or1kPkgs = import crossPkgs.path {
+      localSystem = crossPkgs.stdenv.buildPlatform;
+      crossSystem = crossPkgs.lib.systems.examples.or1k;
+    };
+  };
+
+  # nixpkgs builds all Allwinner U-Boots with SCP=/dev/null (no crust),
+  # which leaves only s2idle. With crust, TF-A offers deep sleep.
+  uboot = crossPkgs.ubootPine64.overrideAttrs (old: {
+    env = (old.env or { }) // { SCP = "${crust}/scp.bin"; };
+  });
 in
 {
   imports = [
@@ -224,6 +235,18 @@ in
         fi
       '';
     };
+    # Tablet behaviour: short press suspends (and wakes), long press powers off
+    services.logind.settings.Login = {
+      HandlePowerKey = "suspend";
+      HandlePowerKeyLongPress = "poweroff";
+    };
+
+    # After deep sleep wpa_supplicant can stay stuck in its back-off after
+    # failed associations; reconnecting from scratch is reliable.
+    powerManagement.resumeCommands = ''
+      ${pkgs.systemd}/bin/systemctl restart wpa_supplicant-wlan0.service
+    '';
+
     systemd.network.networks."40-wlan0" = {
       matchConfig.Name = "wlan0";
       networkConfig.DHCP = "yes";
@@ -268,6 +291,10 @@ in
     # Rotate the console to landscape: fbcon=rotate:1
     # boot.kernelParams = [ "fbcon=rotate:1" ];
 
+    # U-Boot lives in the raw area of the SD card (8 KiB offset), which
+    # nixos-rebuild doesn't touch. This writes the U-Boot of this system.
+    system.build.uboot = uboot;
+
     # Audio: all mixer controls default to muted. Route AIF1 -> DAC ->
     # Line Out (internal speaker amp, PH7) and Headphone.
     systemd.services.irulu-audio-defaults = {
@@ -296,6 +323,26 @@ in
 
     environment.systemPackages = with pkgs; [
       (callPackage ./pkgs/sdl2-kms-test { })
+      (writeShellApplication {
+        name = "irulu-install-uboot";
+        runtimeInputs = [ coreutils util-linux ];
+        text = ''
+          img=${uboot}/u-boot-sunxi-with-spl.bin
+          dev=/dev/mmcblk0   # microSD (mmc0)
+          size=$(stat -c %s "$img")
+          first=$(sfdisk -d "$dev" | sed -n 's/.*start= *\([0-9]*\).*/\1/p' | sort -n | head -1)
+          if [ $((8192 + size)) -gt $((first * 512)) ]; then
+            echo "U-Boot ($size bytes) would overlap the first partition" >&2
+            exit 1
+          fi
+          backup=/root/uboot-backup-$(date +%Y%m%d-%H%M%S).bin
+          dd if="$dev" of="$backup" bs=1024 skip=8 count=$((size / 1024 + 1)) status=none
+          echo "Backed up current U-Boot area to $backup"
+          dd if="$img" of="$dev" bs=1024 seek=8 conv=fsync status=none
+          sync
+          echo "Wrote $img to $dev"
+        '';
+      })
       kmscube
       libdrm # modetest
       mesa-demos # eglinfo
