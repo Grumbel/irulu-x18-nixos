@@ -42,7 +42,7 @@ There's no serial console without opening the case, so:
 - **USB**: connect the tablet's micro-USB port to a PC. The tablet runs
   `g_ether`, the PC gets an address via DHCP, then `ssh root@10.42.0.1`.
 - **Wi-Fi**: `ssh root@irulu-x18.local` (mDNS), or look up the DHCP lease
-  on your router.
+  on your router. `wifi.conf` must contain only `network={...}` blocks.
 
 SSH accepts the keys in `authorized_keys`. The console password for root
 is `irulu`.
@@ -72,6 +72,7 @@ kernel gets the X18 DT through `extlinux.conf`.
 | Black panel, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `mode_flags` per Jadard panel desc |
 | Touch probe fails ("Registers clear error -11") | The GSL chip resets as soon as it latches the reset command; the I2C controller sees a bus error | `patches/0002`: ignore that one write error |
 | Touch coordinates off | Firmware reports 0..1151 x 35..1698 (raw, after swap), not 800x1280 | `touchscreen-min-x/size-x/size-y` in DTS |
+| Wi-Fi scans but never associates (`ASSOC-REJECT status_code=1`) | RTL8723BS-VQ0 has an empty eFuse; Android loads `wifi_efuse_8723bs_vq0.map` instead. Mainline defaults to antenna path S1, the antenna is on S0 (map byte `0xC3 = 0x51`), so TX doesn't work | `patches/0003` adds `rtw_ant_path`; `options r8723bs rtw_ant_path=1 rtw_initmac=<factory MAC>` |
 | First lean kernel died after a few seconds | `allnoconfig` disabled the A64 timer erratum and Cortex-A53 errata | Generate from `alldefconfig` |
 
 Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead

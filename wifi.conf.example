@@ -1,8 +1,6 @@
 # Copy this file to wifi.conf (on the same FAT partition) and fill in your
 # network. It is copied to /etc/wpa_supplicant/imperative.conf at boot.
-ctrl_interface=DIR=/run/wpa_supplicant GROUP=wheel
-update_config=1
-
+# Only network={} blocks: NixOS sets up the control interface itself.
 network={
 	ssid="YOUR-SSID"
 	psk="YOUR-PASSWORD"

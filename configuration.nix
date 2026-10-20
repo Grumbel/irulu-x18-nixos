@@ -13,18 +13,24 @@ let
     patch = ./patches/0002-input-silead-tolerate-reset-command-bus-error.patch;
   };
 
+  rtl8723bsPatch = {
+    # Module parameter to select the antenna path when the eFuse is empty
+    name = "rtl8723bs-ant-path";
+    patch = ./patches/0003-staging-rtl8723bs-add-rtw_ant_path-parameter.patch;
+  };
+
   # Lean kernel: only the drivers this tablet needs (kernel/x18-lean.config,
   # generated from kernel/x18-lean.fragment). Builds in minutes.
   leanKernel = crossPkgs.linuxManualConfig {
     inherit (crossPkgs.linux_6_18) src version;
     modDirVersion = "${crossPkgs.linux_6_18.version}-irulu";
     configfile = ./kernel/x18-lean.config;
-    kernelPatches = [ panelPatch sileadPatch ];
+    kernelPatches = [ panelPatch sileadPatch rtl8723bsPatch ];
   };
 
   # Fallback: the generic nixpkgs kernel (~7400 modules, slow to build)
   genericKernel = crossPkgs.linux_6_18.override (old: {
-    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch sileadPatch ];
+    kernelPatches = (old.kernelPatches or [ ]) ++ [ panelPatch sileadPatch rtl8723bsPatch ];
     # The stock nixpkgs aarch64 config already has the A64 display, panel,
     # touch, PMIC, audio, RTL8723BS and MUSB gadget drivers; only Realtek
     # Bluetooth over UART is missing.
@@ -191,6 +197,15 @@ in
     # Wi-Fi: no networks are declared, so wpa_supplicant reads
     # /etc/wpa_supplicant/imperative.conf, which is seeded from
     # wifi.conf on the FAT partition.
+    # The RTL8723BS-VQ0 module has an empty eFuse (Android loads
+    # /system/etc/wifi/wifi_efuse_8723bs_vq0.map instead). Without it the
+    # driver picks the wrong antenna path (no TX) and a random MAC.
+    # From that map: 0xC3 = 0x51 -> single antenna on S0 (path B).
+    # MAC: factory address from the Android "private" partition.
+    boot.extraModprobeConfig = ''
+      options r8723bs rtw_ant_path=1 rtw_initmac=XX:XX:XX:XX:XX:XX
+    '';
+
     networking.wireless = {
       enable = true;
       interfaces = [ "wlan0" ];
