@@ -62,14 +62,57 @@ defaults (DDR3-1333, 672 MHz, ZQ 0x3b3bbb, ODT on, PMIC left at power-on
 defaults) match the vendor DRAM settings. It uses its own Pine64+ DT; the
 kernel gets the X18 DT through `extlinux.conf`.
 
+## Bring-up findings
+
+| Symptom | Cause | Fix |
+|---------|-------|-----|
+| No USB gadget | `usb_power_supply` disabled, so usbphy deferred forever | Enabled in DTS |
+| No USB gadget (2) | `ehci0`/`ohci0` share PHY 0 with MUSB; probing them switches the port to host mode | Left disabled; `usb_otg` forced to `peripheral` |
+| No Wi-Fi | `mmc-pwrseq-simple` fails on 6.18 with a single reset GPIO (`-ENOENT`) | WL_REG_ON (PL2) as `regulator-fixed` vmmc |
+| Black panel, backlight on | Panel needs **non-burst** DSI video mode (vendor `lcd_dsi_if = 0`) | `mode_flags` per Jadard panel desc |
+
+Mainline runs the DSI lanes at 500 Mbit/s (A64 `pll-mipi` minimum) instead
+of the vendor's 424 Mbit/s; the panel doesn't mind. Vendor vs. mainline
+register dumps are in `../dump/regs/`.
+
+## Debugging over USB
+
+The host may not get a DHCP lease, but IPv6 link-local always works:
+
+```sh
+ping -6 -c2 ff02::1%enp2s0f0u9     # find the tablet's fe80:: address
+ssh root@fe80::...%enp2s0f0u9
+```
+
+`../tools/` has small out-of-tree modules for DSI experiments
+(`dsidbg`, `paneldbg`, `dsihost`); build them against
+`.#kernel`'s `dev` output with the cross compiler.
+
+## Lean kernel (prepared, not wired in yet)
+
+The nixpkgs generic kernel builds ~7,400 modules for hardware this tablet
+doesn't have. `kernel/x18-lean.fragment` lists only what the X18 and
+NixOS/systemd need. `kernel/x18-lean.config` is generated from it
+(about 900 `=y`, 180 `=m`).
+
+To regenerate it after editing the fragment (from an unpacked 6.18 tree):
+
+```sh
+make ARCH=arm64 CROSS_COMPILE=aarch64-unknown-linux-gnu- \
+     KCONFIG_ALLCONFIG=.../kernel/x18-lean.fragment allnoconfig
+python3 .../kernel/check-lean-config.py .../kernel/x18-lean.fragment .config
+cp .config .../kernel/x18-lean.config
+```
+
+`check-lean-config.py` lists fragment options that Kconfig silently dropped
+(usually a missing parent menu). The next step is building it with
+`linuxManualConfig { configfile = ./kernel/x18-lean.config; }` instead of
+`linux_6_18.override`.
+
 ## Known unknowns
 
-- Panel: the init sequence and timings come from the vendor driver, but
-  the reset/power timing follows the mainline Jadard driver.
-- Backlight PWM polarity (`PWM_POLARITY_INVERTED`) is a guess. If the screen
-  is dark but USB works, try `echo 1000 > /sys/class/backlight/*/brightness`
-  and flip the polarity in the DTS.
-- Touch axes: check with `evtest`.
-- If the tablet doesn't power up from SD at all: U-Boot/DRAM. Without UART
-  there's no way to see why. Next options are FEL mode (`sunxi-fel`) or
-  opening the case for the UART pads.
+- Touchscreen: the GSL chip answers its ID (`0x80360000`), but the first
+  register write fails. Not solved yet.
+- Backlight PWM polarity (`PWM_POLARITY_INVERTED`) works but hasn't been
+  checked against brightness levels.
+- SD card: `sunxi-mmc data error` messages under heavy writes.

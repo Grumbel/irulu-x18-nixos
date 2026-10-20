@@ -4,9 +4,9 @@ let
   kernel = crossPkgs.linux_6_18.override (old: {
     kernelPatches = (old.kernelPatches or [ ]) ++ [
       {
-        # Board DTS + JD9365 panel entry, see ../mainline/
+        # JD9365 panel entry for the X18 (non-burst video mode)
         name = "irulu-x18";
-        patch = ./patches/0001-irulu-x18-dts-and-panel.patch;
+        patch = ./patches/0001-drm-panel-jadard-add-iRULU-X18-panel.patch;
       }
     ];
     # The stock nixpkgs aarch64 config already has the A64 display, panel,
@@ -19,7 +19,7 @@ let
   });
 
   # The board DTB is built on its own from ./dts, so DT changes don't need a
-  # kernel rebuild. (The copy of the DTS inside the kernel patch is unused.)
+  # kernel rebuild.
   boardDtbs = crossPkgs.buildPackages.runCommand "irulu-x18-dtbs"
     {
       nativeBuildInputs = with crossPkgs.buildPackages; [ dtc gnutar xz ];
