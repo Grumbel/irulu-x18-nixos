@@ -121,9 +121,11 @@
 	};
 };
 
-&ehci0 {
-	status = "okay";
-};
+/*
+ * ehci0/ohci0 share PHY 0 with the OTG controller. Enabling them makes the
+ * USB core switch PHY 0 to host mode ("Changing dr_mode to 1"), which kills
+ * peripheral mode. Leave them disabled while usb_otg is peripheral-only.
+ */
 
 &ehci1 {
 	status = "okay";
@@ -216,10 +218,6 @@
 };
 
 /* The internal raw NAND (Allwinner proprietary FTL) is not usable. */
-
-&ohci0 {
-	status = "okay";
-};
 
 &ohci1 {
 	status = "okay";
