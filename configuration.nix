@@ -18,6 +18,26 @@ let
     };
   });
 
+  # The board DTB is built on its own from ./dts, so DT changes don't need a
+  # kernel rebuild. (The copy of the DTS inside the kernel patch is unused.)
+  boardDtbs = crossPkgs.buildPackages.runCommand "irulu-x18-dtbs"
+    {
+      nativeBuildInputs = with crossPkgs.buildPackages; [ dtc gnutar xz ];
+    }
+    ''
+      tar xf ${kernel.src} --strip-components=1 --wildcards \
+        '*/include/dt-bindings' '*/include/uapi/linux/input-event-codes.h' \
+        '*/arch/arm64/boot/dts/allwinner' \
+        '*/arch/arm64/boot/dts/*.dtsi'
+      d=arch/arm64/boot/dts/allwinner
+      cp ${./dts/sun50i-a64-irulu-x18.dts} $d/sun50i-a64-irulu-x18.dts
+      ${crossPkgs.buildPackages.stdenv.cc}/bin/cpp -nostdinc -undef -D__DTS__ \
+        -x assembler-with-cpp -I include -I arch/arm64/boot/dts \
+        $d/sun50i-a64-irulu-x18.dts -o x18.pp
+      mkdir -p $out/allwinner
+      dtc -I dts -O dtb -@ -o $out/allwinner/sun50i-a64-irulu-x18.dtb x18.pp
+    '';
+
   # Only the firmware files this board needs, instead of all of linux-firmware
   boardFirmware = pkgs.runCommand "irulu-x18-firmware" { } ''
     mkdir -p $out/lib/firmware/rtlwifi $out/lib/firmware/rtl_bt $out/lib/firmware/silead
@@ -51,6 +71,7 @@ in
 
     boot.kernelPackages = pkgs.linuxPackagesFor kernel;
     hardware.deviceTree.name = "allwinner/sun50i-a64-irulu-x18.dtb";
+    hardware.deviceTree.dtbSource = boardDtbs;
 
     boot.loader.grub.enable = false;
     boot.loader.generic-extlinux-compatible.enable = true;
