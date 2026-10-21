@@ -106,7 +106,8 @@ appear on the screen after a few seconds; the first boot takes about
 
 - **Over Wi-Fi**: `ssh root@irulu-x18.local`
 - **Over USB**: connect the tablet's micro-USB port to your PC. A new
-  network interface appears on the PC; then `ssh root@10.42.0.1`.
+  network interface appears on the PC; then `ssh root@10.42.0.1` (or
+  `ssh root@irulu-x18-usb.local`).
   If your PC doesn't pick up an address, use the IPv6 link-local address
   (replace `usb0` with the name of the new interface):
   ```sh

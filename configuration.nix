@@ -151,9 +151,36 @@
   services.avahi = {
     enable = true;
     nssmdns4 = true;
+    # IPv4 only: otherwise the PC often gets usb0's fe80:: address first,
+    # and glibc on the PC drops its scope, so ssh fails with "connect:
+    # Invalid argument". Over USB the tablet is then irulu-x18-usb.local
+    # (10.42.0.1, needs the PC to take a DHCP lease on the USB link).
+    ipv6 = false;
+    extraConfig = ''
+      [publish]
+      publish-aaaa-on-ipv4=no
+    '';
     publish = {
       enable = true;
       addresses = true;
+      userServices = true; # lets avahi-publish (irulu-mdns-usb) register names
+    };
+  };
+
+  # Leave mDNS to avahi (two responders on 5353 make it unreliable)
+  services.resolved.settings.Resolve.MulticastDNS = false;
+  # Fixed name for the USB link, so it works without Wi-Fi. A static
+  # /etc/avahi/hosts entry collides with the host name's reverse record
+  # for 10.42.0.1, hence avahi-publish --no-reverse.
+  systemd.services.irulu-mdns-usb = {
+    description = "Publish irulu-x18-usb.local for the USB link";
+    wantedBy = [ "multi-user.target" ];
+    requires = [ "avahi-daemon.service" ];
+    after = [ "avahi-daemon.service" ];
+    serviceConfig = {
+      ExecStart = "${pkgs.avahi}/bin/avahi-publish --address --no-reverse irulu-x18-usb.local 10.42.0.1";
+      Restart = "always"; # also exits 0 on errors
+      RestartSec = 5;
     };
   };
 
