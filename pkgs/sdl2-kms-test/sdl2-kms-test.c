@@ -122,13 +122,8 @@ int main(int argc, char **argv)
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 
-	/* Keep the triangle round on the portrait screen */
 	GLint u_angle = glGetUniformLocation(prog, "angle");
 	GLint u_scale = glGetUniformLocation(prog, "scale");
-	if (w < h)
-		glUniform2f(u_scale, 1.0f, (float)w / h);
-	else
-		glUniform2f(u_scale, (float)h / w, 1.0f);
 
 	start = last_report = SDL_GetTicks();
 	while (!quit) {
@@ -165,6 +160,19 @@ int main(int argc, char **argv)
 				break;
 			}
 		}
+
+		/*
+		 * Under Wayland the size is only known after the compositor's
+		 * configure event (the drawable is 1x1 right after creation),
+		 * and SDL doesn't update the viewport on resize.
+		 */
+		SDL_GL_GetDrawableSize(win, &w, &h);
+		glViewport(0, 0, w, h);
+		/* Keep the triangle round on the portrait screen */
+		if (w < h)
+			glUniform2f(u_scale, 1.0f, (float)w / h);
+		else
+			glUniform2f(u_scale, (float)h / w, 1.0f);
 
 		glDisable(GL_SCISSOR_TEST);
 		glClearColor(0.1f, 0.1f, 0.2f, 1.0f);
