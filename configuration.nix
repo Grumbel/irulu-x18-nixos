@@ -29,6 +29,10 @@
     "panic=60"
   ];
   boot.consoleLogLevel = 7;
+  # Plain ext4 root: keep LVM and bcache out of the initrd (smaller initrd,
+  # faster to load from the SD card and to unpack)
+  services.lvm.enable = false;
+  boot.bcache.enable = false;
   # Landscape console instead of the panel's native portrait:
   # boot.kernelParams = [ "fbcon=rotate:1" ];
 
@@ -140,6 +144,8 @@
     };
   };
   networking.firewall.allowedUDPPorts = [ 67 ];
+  # One `nft -f` instead of dozens of iptables calls (2.0 s -> 1.6 s)
+  networking.nftables.enable = true;
 
   # mDNS, so it's reachable as irulu-x18.local over Wi-Fi
   services.avahi = {

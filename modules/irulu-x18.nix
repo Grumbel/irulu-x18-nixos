@@ -195,9 +195,14 @@ in
 
     boot.loader.grub.enable = false;
     boot.loader.generic-extlinux-compatible.enable = true;
+    # U-Boot's menu is only visible on the (internal) serial port and the
+    # screen stays dark meanwhile; the default 5 s wait is wasted.
+    boot.loader.timeout = lib.mkDefault 1;
 
     # Some of these may be built in, which is fine.
     boot.initrd.allowMissingModules = true;
+    # No TPM on this board; saves tpm2-tss (and its deps) in the initrd
+    boot.initrd.systemd.tpm2.enable = lib.mkDefault false;
     boot.initrd.availableKernelModules = [
       "sunxi-mmc"
       "sunxi-rsb"
@@ -205,8 +210,9 @@ in
       "axp20x-regulator"
     ];
     # Load the display stack in the initrd so the console shows up early
-    # (there is no serial console without opening the case).
-    boot.initrd.kernelModules = [
+    # (there is no serial console without opening the case). The lean
+    # kernel has these built in.
+    boot.initrd.kernelModules = lib.mkIf (!cfg.leanKernel) [
       "sun4i-drm"
       "sun8i-mixer"
       "sun4i-tcon"
