@@ -248,6 +248,12 @@ in
       install r8723bs ${r8723bsModprobe}
     '';
 
+    # --- Bluetooth (RTL8723BS, H5 over UART1) -------------------------------
+    hardware.bluetooth = {
+      enable = lib.mkDefault true;
+      powerOnBoot = lib.mkDefault true;
+    };
+
     # --- Power ------------------------------------------------------------
 
     # Tablet behaviour: short press suspends (and wakes), long press powers off
