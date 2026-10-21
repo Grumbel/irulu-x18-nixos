@@ -89,6 +89,41 @@ let
     done
   '';
 
+  # Screen rotation from the accelerometer. In the panel's native portrait
+  # the chip's +Y points to the top edge and +Z out of the back (face up
+  # reads z = -1 g). Rotates only when the orientation changes, so the
+  # manual rotate button stays in effect until the tablet is turned.
+  autorotate = pkgs.writeShellScript "irulu-autorotate" ''
+    export PATH=${
+      lib.makeBinPath [
+        pkgs.coreutils
+        config.programs.sway.package
+      ]
+    }
+    for d in /sys/bus/iio/devices/iio:device*; do
+      [ "$(< "$d/name")" = da280 ] && cd "$d" && break
+    done
+    [ -e in_accel_x_raw ] || exit 0
+
+    g=2048 # 0.5 g at 4096 counts per g
+    current="" candidate=""
+    while sleep 1; do
+      read -r x < in_accel_x_raw
+      read -r y < in_accel_y_raw
+      if ((y > g && y * y > x * x)); then o=normal
+      elif ((y < -g && y * y > x * x)); then o=180
+      elif ((x > g)); then o=270
+      elif ((x < -g)); then o=90
+      else continue # flat or in between: keep the current rotation
+      fi
+      # Two readings in a row, so a brief tilt doesn't flip the screen
+      if [ "$o" = "$candidate" ] && [ "$o" != "$current" ]; then
+        swaymsg -q output ${output} transform "$o" && current=$o
+      fi
+      candidate=$o
+    done
+  '';
+
   swayConfig = pkgs.writeText "sway-config" ''
     # 800x1280 at about 190 dpi: scale up for finger-sized targets
     output ${output} scale 1.5
@@ -119,6 +154,7 @@ let
       resume 'swaymsg "output * power on"' \
       after-resume 'swaymsg "output * power on"'
     exec foot
+    exec ${autorotate}
 
     bindsym --locked XF86AudioRaiseVolume exec ${volume} 5%+
     bindsym --locked XF86AudioLowerVolume exec ${volume} 5%-

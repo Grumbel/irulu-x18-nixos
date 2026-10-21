@@ -171,10 +171,14 @@
 	status = "okay";
 
 	/*
-	 * MiraMEMS "mir3da" accelerometer at 0x27 (BSP DT says 0x1d, the
-	 * driver probes 0x27). Interrupt on PH5. TODO: identify the chip
-	 * (DA213/DA217/DA280?) and check drivers/iio/accel/da280.c.
+	 * MiraMEMS "mir3da" accelerometer (BSP DT says 0x1d, the chip is at
+	 * 0x27). Chip ID 0x13 and register map as DA280. Its interrupt on
+	 * PH5 is left out: the da280 driver only polls.
 	 */
+	accelerometer@27 {
+		compatible = "miramems,da280";
+		reg = <0x27>;
+	};
 };
 
 &lradc {

@@ -326,6 +326,9 @@ CONFIG_BT_HCIUART_3WIRE=y
 CONFIG_BT_HCIUART_RTL=y
 CONFIG_BT_RTL=m
 
+# --- Sensors -----------------------------------------------------------------
+CONFIG_DA280=m
+
 # --- Input -----------------------------------------------------------------
 CONFIG_INPUT=y
 CONFIG_INPUT_EVDEV=y

@@ -254,6 +254,10 @@ in
       powerOnBoot = lib.mkDefault true;
     };
 
+    # --- Accelerometer (MiraMEMS, DA280-compatible) -------------------------
+    # da280 has no OF match table, so udev can't autoload it from the DT node
+    boot.kernelModules = [ "da280" ];
+
     # --- Power ------------------------------------------------------------
 
     # Tablet behaviour: short press suspends (and wakes), long press powers off
