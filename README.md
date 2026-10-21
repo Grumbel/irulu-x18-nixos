@@ -34,14 +34,16 @@ are specific to this board. Booting from SD is harmless to try, though.
 | Touchscreen (multi-touch) | ✅ |
 | GPU: OpenGL ES 2.0 (Mesa lima), KMS/DRM | ✅ about 64 fps vsync |
 | Wi-Fi (2.4 GHz) | ✅ |
-| Bluetooth | ✅ firmware loads, little tested |
-| Speaker | ✅ |
+| Bluetooth (e.g. a keyboard) | ✅ connecting is slow, see below |
+| Speaker, headphones | ✅ speaker turns off while headphones are plugged in |
+| Microphone | ✅ |
+| Accelerometer, automatic screen rotation | ✅ |
 | Battery level, power-off at 3.3 V | ✅ |
+| Charging with a wall charger | ✅ |
 | Suspend to RAM (deep sleep), power-button wake | ✅ |
 | USB networking to a PC (micro-USB port) | ✅ |
 | Volume buttons | ⚠️ configured, voltages not verified |
-| Headphones, charging with a wall charger | ❓ untested |
-| Microphone, accelerometer, cameras | ❌ not yet |
+| Cameras | ❌ not yet |
 
 See [Known issues](#known-issues) for details.
 
@@ -129,9 +131,38 @@ The example system starts a minimal [sway](https://swaywm.org/) session
 as user `tablet` (password `irulu`). Every window fills the screen; the
 top bar has buttons for the app launcher (☰), the on-screen keyboard (⌨),
 rotating the screen (⟳), brightness (☀) and closing the window (✕). The
-screen turns off after 2 minutes; touch it to turn it back on. The setup
-is in `gui.nix`; remove its import from `configuration.nix` for a
-console-only system.
+screen also rotates by itself when you turn the tablet; the ⟳ button
+overrides that until the tablet is turned again. The screen turns off
+after 10 minutes; touch it to turn it back on. The setup is in `gui.nix`;
+remove its import from `configuration.nix` for a console-only system.
+
+### Software
+
+Besides the GUI, the example system has Firefox (in the launcher), mpv
+and a few command-line tools (rsync, wget, curl, ripgrep, fd, bat, jq,
+tmux, ncdu, ...). With only 1 GB of RAM, compressed swap in RAM (zram)
+makes room for the browser, and earlyoom stops the biggest process
+before the system runs out of memory.
+
+### Bluetooth
+
+Pair devices with `bluetoothctl` (`scan on`, `pair <address>`,
+`trust <address>`, `connect <address>`). Paired devices reconnect by
+themselves.
+
+### Audio
+
+Sound goes through PipeWire in the GUI session. As root (over SSH),
+where no PipeWire runs, address the card directly:
+
+```sh
+arecord -D plughw:0 -f S16_LE -r 48000 -c 2 -d 5 test.wav
+aplay -D plughw:0 test.wav
+```
+
+The volume buttons change the codec's volume. The mixer defaults
+(speaker, headphones, microphone) are set at boot by
+`irulu-audio-defaults.service`.
 
 ### Graphics test
 
@@ -215,8 +246,17 @@ SD card image (networking, SSH, test tools).
   problem.
 - **SD card errors** (`sunxi-mmc ... data error`) appear under heavy writes
   with some cards.
-- **Not supported yet**: microphone, accelerometer (screen rotation),
-  cameras, headphone jack detection.
+- **Wi-Fi under load**: the driver needs a lot of CPU; with heavy traffic
+  while the CPU is busy (e.g. Firefox loading a page) the connection can
+  stall for a minute or two.
+- **Bluetooth** connections take several seconds to set up and sometimes
+  time out; once connected, they work. It wasn't reliable under Android
+  either. All tablets share the same Bluetooth address
+  (`00:E0:4C:23:99:87`, from the generic Realtek configuration file).
+- **Power from a PC's USB port** (500 mA) doesn't cover full CPU load; the
+  tablet can switch off under load even with a charged battery. Use a
+  wall charger.
+- **Not supported yet**: cameras.
 - **No serial console** without opening the case. During boot, `dmesg` is
   written to `dmesg-initrd.txt` and `dmesg-stage2.txt` on the `FIRMWARE`
   partition, so early failures can be read on a PC.
@@ -229,7 +269,7 @@ SD card image (networking, SSH, test tools).
 | `configuration.nix` | Example system for the SD card image |
 | `gui.nix` | Minimal touch GUI (sway) for the example system |
 | `dts/sun50i-a64-irulu-x18.dts` | Device tree for the board |
-| `patches/` | Kernel patches (panel, touchscreen, Wi-Fi calibration) |
+| `patches/` | Kernel patches (panel, touchscreen, Wi-Fi calibration, headphone detection) |
 | `kernel/` | Lean kernel config and the fragment it is generated from |
 | `pkgs/crust/` | crust firmware for deep sleep |
 | `firmware/` | Touchscreen firmware and Wi-Fi calibration data from the stock Android |
@@ -251,12 +291,14 @@ SD card image (networking, SSH, test tools).
 | Lean kernel died after seconds | `allnoconfig` also disabled the A64 timer erratum and CPU errata | Config generated from `alldefconfig` |
 | GPU scanout fails (`CREATE_DUMB ... Cannot allocate memory`) | No CMA pool | `CMA_SIZE_MBYTES=128` |
 | Battery could deep-discharge | PMIC power-off at 2.6 V by default | `simple-battery` node: 3.3 V, 4000 mAh |
+| Accelerometer not found | The vendor DT says 0x1d; the chip (MiraMEMS "mir3da") is at 0x27 and is register-compatible with the DA280 | `miramems,da280` node; the module is loaded explicitly, as `da280` has no OF match table |
+| No headphone detection | The codec has its own jack detection, but `simple-audio-card` never attaches a jack to it, and the driver never set the jack type | `patches/0004`; `irulu-headphone-switch.service` turns the speaker off |
 
 ### Lean kernel
 
 The generic nixpkgs kernel builds about 7,400 modules for hardware this
 tablet doesn't have. `kernel/x18-lean.fragment` lists only what the tablet
-and NixOS need; `kernel/x18-lean.config` (about 1,240 `=y`, 200 `=m`) is
+and NixOS need; `kernel/x18-lean.config` (about 1,260 `=y`, 190 `=m`) is
 generated from it. To regenerate after editing the fragment, in an
 unpacked Linux 6.18 source tree:
 
