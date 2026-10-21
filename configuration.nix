@@ -128,6 +128,11 @@
   systemd.network.networks."40-wlan0" = {
     matchConfig.Name = "wlan0";
     networkConfig.DHCP = "yes";
+    # Ignore NTP servers from DHCP: timesyncd only tries those once it has
+    # any, and many home routers announce one without answering, so the
+    # clock never got set.
+    dhcpV4Config.UseNTP = false;
+    dhcpV6Config.UseNTP = false;
   };
 
   # USB: connect the micro-USB port to a PC and `ssh root@10.42.0.1`.
