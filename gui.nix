@@ -115,7 +115,8 @@ let
     exec wvkbd-mobintl --hidden -H 250 -L 200
     exec swayidle -w \
       timeout 120 'swaymsg "output * power off"' \
-      resume 'swaymsg "output * power on"'
+      resume 'swaymsg "output * power on"' \
+      after-resume 'swaymsg "output * power on"'
     exec foot
 
     bindsym --locked XF86AudioRaiseVolume exec ${volume} 5%+
