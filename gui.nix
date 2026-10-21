@@ -155,6 +155,27 @@ in
   };
   environment.etc."sway/config".source = lib.mkForce swayConfig;
 
+  # Firefox: less background traffic, which keeps the r8723bs driver
+  # threads busy and can stall Wi-Fi while pages render
+  programs.firefox = {
+    enable = true;
+    policies = {
+      DisableTelemetry = true;
+      DisableFirefoxStudies = true;
+      DisablePocket = true;
+      FirefoxHome = {
+        SponsoredTopSites = false;
+        SponsoredStories = false;
+        Stories = false;
+      };
+      UserMessaging = {
+        ExtensionRecommendations = false;
+        FeatureRecommendations = false;
+        SkipOnboarding = true;
+      };
+    };
+  };
+
   # Power off, reboot and suspend as entries in the app launcher
   environment.systemPackages =
     map
