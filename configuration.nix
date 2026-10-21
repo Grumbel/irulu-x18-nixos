@@ -229,7 +229,34 @@
     usbutils
     htop
     dtc
+    # General tools
+    rsync
+    wget
+    curl
+    ripgrep
+    fd
+    bat
+    jq
+    tmux
+    tree
+    ncdu
+    file
+    unzip
+    strace
+    mpv
   ];
+
+  # --- Memory -----------------------------------------------------------------
+
+  # 1 GB RAM: compressed swap in RAM, so a browser fits. lzo-rle, the
+  # lean kernel has no zstd backend for zram.
+  zramSwap = {
+    enable = true;
+    algorithm = "lzo-rle";
+    memoryPercent = 100;
+  };
+  # Kill the biggest process before the system thrashes to a standstill
+  services.earlyoom.enable = true;
 
   documentation.enable = false;
   nix.settings.experimental-features = [
