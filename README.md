@@ -120,7 +120,8 @@ appear on the screen after a few seconds; the first boot takes about
 ### Power button
 
 - Short press: suspend (deep sleep); press again to wake up
-- Long press: power off
+- Hold for 5 s: clean power off
+- Hold for 10 s: hard power off by the PMIC, for when the system hangs
 
 ### Touch GUI
 

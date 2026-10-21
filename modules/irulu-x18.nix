@@ -256,6 +256,13 @@ in
       HandlePowerKeyLongPress = lib.mkDefault "poweroff";
     };
 
+    # logind needs the key held for 5 s to see a long press, but the AXP803
+    # cuts the power itself after 6 s, which leaves only a 1 s window for a
+    # clean poweroff. Move the hardware power-off to the maximum, 10 s.
+    services.udev.extraRules = ''
+      ACTION=="add|bind", SUBSYSTEM=="platform", DRIVER=="axp20x-pek", ATTR{shutdown}="10000"
+    '';
+
     # After deep sleep wpa_supplicant can stay in its back-off after failed
     # associations; reconnecting from scratch is reliable.
     powerManagement.resumeCommands = lib.mkIf config.networking.wireless.enable ''
