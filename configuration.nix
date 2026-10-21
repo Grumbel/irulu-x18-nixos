@@ -13,6 +13,7 @@
   imports = [
     "${modulesPath}/installer/sd-card/sd-image.nix"
     "${modulesPath}/profiles/minimal.nix"
+    ./gui.nix # touch GUI (sway); remove for a console-only system
   ];
 
   hardware.irulu-x18.enable = true;

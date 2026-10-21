@@ -122,7 +122,19 @@ appear on the screen after a few seconds; the first boot takes about
 - Short press: suspend (deep sleep); press again to wake up
 - Long press: power off
 
+### Touch GUI
+
+The example system starts a minimal [sway](https://swaywm.org/) session
+as user `tablet` (password `irulu`). Every window fills the screen; the
+top bar has buttons for the app launcher (☰), the on-screen keyboard (⌨),
+rotating the screen (⟳), brightness (☀) and closing the window (✕). The
+screen turns off after 2 minutes; touch it to turn it back on. The setup
+is in `gui.nix`; remove its import from `configuration.nix` for a
+console-only system.
+
 ### Graphics test
+
+The GUI holds the display, so stop it first (`systemctl stop greetd`):
 
 ```sh
 SDL_VIDEODRIVER=kmsdrm sdl2-kms-test 20   # spinning triangle, white squares under your fingers
@@ -214,6 +226,7 @@ SD card image (networking, SSH, test tools).
 |---|---|
 | `modules/irulu-x18.nix` | Hardware support (kernel, device tree, firmware, U-Boot, Wi-Fi, audio, power) |
 | `configuration.nix` | Example system for the SD card image |
+| `gui.nix` | Minimal touch GUI (sway) for the example system |
 | `dts/sun50i-a64-irulu-x18.dts` | Device tree for the board |
 | `patches/` | Kernel patches (panel, touchscreen, Wi-Fi calibration) |
 | `kernel/` | Lean kernel config and the fragment it is generated from |
