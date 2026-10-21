@@ -40,6 +40,11 @@ let
       name = "rtl8723bs-efuse-file";
       patch = ../patches/0003-staging-rtl8723bs-load-efuse-map-from-firmware-file.patch;
     }
+    {
+      # Headphone detection: use the codec's own jack detection
+      name = "sun8i-codec-headset-jack";
+      patch = ../patches/0004-asoc-sun8i-codec-create-headset-jack.patch;
+    }
   ];
 
   # Lean kernel: only the drivers this tablet needs (kernel/x18-lean.config,
@@ -300,6 +305,53 @@ in
         $a "Headphone Source" DAC
         $a "Headphone" on
         $a "Headphone" 60%
+        # Internal microphone: MIC1 -> ADC -> AIF1
+        $a "Mic1" cap
+        $a "Mic1 Boost" 4
+        $a "ADC Gain" 3
+        $a "ADC" 160
+        $a "AIF1 AD0" 160
+        $a "AIF1 Slot 0 Digital ADC" cap
+        $a "AIF1 Data Digital ADC" cap
+      '';
+    };
+
+    # Speaker off while headphones are plugged in (patches/0004 reports
+    # the jack as an input switch)
+    systemd.services.irulu-headphone-switch = {
+      description = "Turn the speaker off while headphones are plugged in";
+      wantedBy = [ "multi-user.target" ];
+      after = [ "irulu-audio-defaults.service" ];
+      path = [
+        pkgs.alsa-utils
+        pkgs.evtest
+        pkgs.coreutils
+      ];
+      serviceConfig.Restart = "on-failure";
+      script = ''
+        for i in $(seq 20); do
+          for d in /sys/class/input/event*; do
+            case $(cat "$d/device/name") in
+              *"Headset Jack") dev=/dev/input/''${d##*/} ;;
+            esac
+          done
+          [ -n "''${dev:-}" ] && break
+          sleep 1
+        done
+        [ -n "''${dev:-}" ] || exit 1
+
+        # evtest --query exits with 10 while the switch is set
+        update() {
+          if evtest --query "$dev" EV_SW SW_HEADPHONE_INSERT; then
+            amixer -q -c0 set "Line Out" on
+          else
+            amixer -q -c0 set "Line Out" off
+          fi
+        }
+        update
+        stdbuf -oL evtest "$dev" | while read -r line; do
+          case $line in *SW_HEADPHONE_INSERT*) update ;; esac
+        done
       '';
     };
 
