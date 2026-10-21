@@ -3,7 +3,8 @@
 # - Windows are tabbed (each one fills the screen, tap the tabs to switch)
 # - Top bar buttons: apps (launcher), keyboard (on-screen keyboard),
 #   rotate, brightness, close window; battery and clock on the right
-# - The screen turns off after 2 minutes; touch it to turn it back on
+# - Power off, Reboot and Suspend are in the app launcher
+# - The screen turns off after 10 minutes; touch it to turn it back on
 {
   config,
   lib,
@@ -114,7 +115,7 @@ let
     # On-screen keyboard, hidden until the ⌨ button is tapped
     exec wvkbd-mobintl --hidden -H 250 -L 200
     exec swayidle -w \
-      timeout 120 'swaymsg "output * power off"' \
+      timeout 600 'swaymsg "output * power off"' \
       resume 'swaymsg "output * power on"' \
       after-resume 'swaymsg "output * power on"'
     exec foot
@@ -153,6 +154,31 @@ in
     ];
   };
   environment.etc."sway/config".source = lib.mkForce swayConfig;
+
+  # Power off, reboot and suspend as entries in the app launcher
+  environment.systemPackages =
+    map
+      (
+        { name, desktopName }:
+        pkgs.makeDesktopItem {
+          inherit name desktopName;
+          exec = "systemctl ${name}";
+        }
+      )
+      [
+        {
+          name = "poweroff";
+          desktopName = "Power off";
+        }
+        {
+          name = "reboot";
+          desktopName = "Reboot";
+        }
+        {
+          name = "suspend";
+          desktopName = "Suspend";
+        }
+      ];
 
   # Log in automatically; if sway exits, it is started again
   services.greetd = {
