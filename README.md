@@ -119,6 +119,9 @@ appear on the screen after a few seconds; the first boot takes about
 - **On the tablet**: with a USB keyboard on an OTG adapter, log in as
   `root`, password `irulu`. Change it with `passwd`.
 
+SSH only accepts keys (`authorized_keys`), no passwords: the console
+passwords are the same on every image.
+
 ### Power button
 
 - Short press: suspend (deep sleep); press again to wake up
