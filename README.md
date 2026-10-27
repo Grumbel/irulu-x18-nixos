@@ -9,7 +9,7 @@ On Amazon this tablet was sold as *"iRULU eXpro X1S Tablet PC, Android 5.1
 Lollipop, Quad Core, 16 GB Nand Flash, 8 Zoll mit HD-Auflösung 1280 \* 800,
 weiss und silber mit Metallgehäuse"*. Internally it calls itself **X18**.
 
-![iRULU X18 running NixOS](docs/screenshot.png)
+![iRULU X18 running NixOS](docs/tablet.jpg)
 
 ## Is this my tablet?
 
